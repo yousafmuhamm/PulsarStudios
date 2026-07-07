@@ -1,0 +1,44 @@
+:root {
+  /* palette */
+  --bg: #f2f1ef;
+  --ink: #0d0d0f;
+  --paper: #f2f1ef;
+  --accent: #6533ff;
+  --accent-2: #b8ff2c;
+  --muted: #8a8a8e;
+  --line: rgba(13, 13, 15, 0.14);
+
+  /* type */
+  --font-display: 'Archivo', 'Helvetica Neue', Helvetica, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+  --fs-hero: clamp(2.8rem, 8vw, 9rem);
+  --fs-h2: clamp(2rem, 5vw, 4.5rem);
+  --fs-h3: clamp(1.4rem, 2.6vw, 2.4rem);
+  --fs-body: clamp(1rem, 1.1vw, 1.25rem);
+  --fs-big-para: clamp(1.5rem, 3.2vw, 3rem);
+  --fs-mono: 0.72rem;
+  --ls-tight: -0.03em;
+  --ls-mono: 0.1em;
+
+  /* layout */
+  --max-w: 1680px;
+  --gutter: clamp(16px, 2.5vw, 40px);
+  --header-h: 84px;
+
+  /* motion */
+  --ease-out: cubic-bezier(0.19, 1, 0.22, 1);
+  --dur-hover: 0.4s;
+
+  /* z-order */
+  --z-main: 1;
+  --z-gl: 3;
+  --z-grain: 50;
+  --z-menu: 60;
+  --z-header: 70;
+  --z-scrim: 74;
+  --z-contact: 75;
+  --z-veil: 80;
+  --z-reel: 85;
+  --z-preloader: 90;
+  --z-cursor: 100;
+}

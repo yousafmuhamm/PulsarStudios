@@ -1,0 +1,12 @@
+node_modules
+dist
+.DS_Store
+
+# generated at dev/build time from src/templates + src/data (see scripts/pages-plugin.js)
+/index.html
+/about.html
+/projects.html
+/projects/*.html
+/public/assets/img/projects/*.svg
+/public/sitemap.xml
+/public/robots.txt

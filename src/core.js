@@ -1,0 +1,49 @@
+/**
+ * Shared singletons: gsap + ScrollTrigger + Lenis, wired together once.
+ * Everything else imports from here so there is exactly one ticker.
+ */
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import Lenis from 'lenis';
+import { reducedMotion } from './utils/env.js';
+
+gsap.registerPlugin(ScrollTrigger);
+ScrollTrigger.config({ ignoreMobileResize: true });
+
+export { gsap, ScrollTrigger };
+
+export let lenis = null;
+
+export function initScroll() {
+  if (reducedMotion) return null; // native scroll, simple fades elsewhere
+  lenis = new Lenis({
+    autoRaf: false,
+    lerp: 0.105,
+    wheelMultiplier: 1,
+  });
+  lenis.on('scroll', ScrollTrigger.update);
+  gsap.ticker.add((time) => lenis.raf(time * 1000));
+  gsap.ticker.lagSmoothing(0);
+  return lenis;
+}
+
+export function scrollToTop() {
+  if (lenis) lenis.scrollTo(0, { immediate: true, force: true });
+  else window.scrollTo(0, 0);
+}
+
+export function lockScroll() {
+  if (lenis) lenis.stop();
+  else document.documentElement.style.overflow = 'hidden';
+}
+
+export function unlockScroll() {
+  if (lenis) lenis.start();
+  else document.documentElement.style.overflow = '';
+}
+
+export const scrollY = () => (lenis ? lenis.scroll : window.scrollY);
+export const scrollLimit = () =>
+  lenis
+    ? lenis.limit
+    : document.documentElement.scrollHeight - window.innerHeight;

@@ -1,0 +1,147 @@
+.footer {
+  position: relative;
+  padding-top: clamp(5rem, 14vh, 10rem);
+}
+
+.footer__cta {
+  padding-inline: var(--gutter);
+  max-width: var(--max-w);
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.footer__eyebrow {
+  color: var(--muted);
+  margin-bottom: clamp(1rem, 3vh, 2rem);
+}
+
+.footer__line {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 9.5vw, 10.5rem);
+  font-weight: 580;
+  letter-spacing: var(--ls-tight);
+  line-height: 0.98;
+  text-align: left;
+  color: var(--paper);
+}
+
+.footer__line--fill .sc {
+  color: rgba(242, 241, 239, 0.18);
+}
+
+.footer__line:hover {
+  color: var(--paper);
+}
+
+.footer__marquee {
+  margin-top: clamp(3rem, 8vh, 6rem);
+  padding-block: 1.1rem;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--muted);
+  display: flex;
+}
+
+.footer__marquee-chunk,
+.brands__chunk {
+  display: inline-block;
+  flex-shrink: 0;
+  will-change: transform;
+}
+
+.footer__grid {
+  max-width: var(--max-w);
+  margin-inline: auto;
+  padding: clamp(3rem, 7vh, 5rem) var(--gutter);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+}
+
+.footer__col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.footer__label {
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+
+.footer__label--gap {
+  margin-top: 1.2rem;
+}
+
+.footer__address {
+  line-height: 1.5;
+}
+
+.footer__social {
+  width: fit-content;
+}
+
+.footer__bottom {
+  max-width: var(--max-w);
+  margin-inline: auto;
+  padding: 1.4rem var(--gutter);
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--muted);
+}
+
+.footer__next {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  padding: clamp(2.5rem, 7vh, 5rem) var(--gutter) clamp(3rem, 8vh, 5.5rem);
+  text-align: center;
+}
+
+.footer__next-hint {
+  color: var(--muted);
+}
+
+.footer__next-label {
+  font-size: var(--fs-h3);
+  font-weight: 560;
+  letter-spacing: var(--ls-tight);
+}
+
+.footer__next-bar {
+  width: min(260px, 50vw);
+  height: 2px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 0.6rem;
+}
+
+.footer__next-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--accent-2);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+@media (max-width: 768px) {
+  .footer__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .footer__bottom {
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+}
