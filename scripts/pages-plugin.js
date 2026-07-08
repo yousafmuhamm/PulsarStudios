@@ -19,6 +19,8 @@ async function loadFresh(rel) {
 }
 
 export async function generateAll() {
+  // templates read this to cache-bust their own nested imports (chrome.js)
+  globalThis.__pulsarGenT = Date.now();
   const { projects } = await loadFresh('src/data/projects.js');
   const { renderHome, renderAbout, renderProjectsList, renderProjectDetail } =
     await loadFresh('src/templates/pages.js');

@@ -1,104 +1,131 @@
 /**
- * Custom cursor — lime dot + trailing ring. Grows over interactive
- * elements; morphs into a labelled circle over [data-cursor] targets
- * ("Drag", "Play", "Open"). Hidden entirely on touch devices.
+ * Custom cursor — a single fluid dot that *replaces* the native cursor
+ * (html.has-cursor sets `cursor: none`). It stretches along its velocity
+ * like a droplet, inverts over any background via mix-blend difference,
+ * swells into a soft inverting disc over interactive elements, becomes a
+ * lime labelled coin over [data-cursor] targets ("Open" / "Play" / "Drag"),
+ * squashes on press, and steps aside over text fields so the native
+ * I-beam and caret take over. Size changes animate width/height (not
+ * scale) so the label text stays crisp.
  */
 import { gsap } from '../core.js';
 import { isTouch, reducedMotion } from '../utils/env.js';
 
-const INTERACTIVE = 'a, button, input, select, textarea, label, [data-cursor]';
+const INTERACTIVE = 'a, button, label, summary, [data-cursor], [data-magnetic]';
+const TEXTY = 'input, textarea, select';
+
+const SIZE = { default: 18, link: 44, label: 72 };
 
 export function initCursor() {
-  const rootEl = document.querySelector('[data-cursor-dot]')?.closest('.cursor');
-  if (!rootEl || isTouch) return { kill() {} };
+  const root = document.querySelector('[data-cursor-root]');
+  const blob = root?.querySelector('[data-cursor-blob]');
+  const label = root?.querySelector('[data-cursor-label]');
+  if (!root || !blob || isTouch) return { kill() {} };
 
-  const dot = rootEl.querySelector('[data-cursor-dot]');
-  const ring = rootEl.querySelector('[data-cursor-ring]');
-  const label = rootEl.querySelector('[data-cursor-label]');
+  document.documentElement.classList.add('has-cursor');
 
-  const mouse = { x: -100, y: -100 };
-  const dotPos = { x: -100, y: -100 };
-  const ringPos = { x: -100, y: -100 };
+  const pos = { x: -100, y: -100 };
+  const target = { x: -100, y: -100 };
+  const prev = { x: -100, y: -100 };
   let visible = false;
-  let ringScale = 1;
-  let ringScaleTarget = 1;
+  let mode = 'default';
+  let press = 1;
 
-  gsap.set([dot, ring], { xPercent: 0, yPercent: 0, force3D: true, autoAlpha: 0 });
+  const sizeTo = gsap.quickTo(blob, 'width', { duration: 0.4, ease: 'back.out(1.8)' });
+  const sizeToH = gsap.quickTo(blob, 'height', { duration: 0.4, ease: 'back.out(1.8)' });
+  // NB: quickTo can't drive compound props like autoAlpha — plain opacity
+  const fadeTo = gsap.quickTo(blob, 'opacity', { duration: 0.25, ease: 'power2.out' });
+
+  const setMode = (next, labelText = '') => {
+    if (mode === next && !labelText) return;
+    mode = next;
+    root.classList.toggle('has-label', next === 'label');
+    if (labelText) label.textContent = labelText;
+    const s = next === 'text' ? SIZE.default : SIZE[next] || SIZE.default;
+    sizeTo(s);
+    sizeToH(s);
+    fadeTo(next === 'text' ? 0 : visible ? 1 : 0);
+  };
 
   const onMove = (e) => {
-    mouse.x = e.clientX;
-    mouse.y = e.clientY;
+    target.x = e.clientX;
+    target.y = e.clientY;
     if (!visible) {
       visible = true;
-      dotPos.x = ringPos.x = mouse.x;
-      dotPos.y = ringPos.y = mouse.y;
-      gsap.to([dot, ring], { autoAlpha: 1, duration: 0.3 });
+      pos.x = prev.x = target.x;
+      pos.y = prev.y = target.y;
+      if (mode !== 'text') fadeTo(1);
     }
   };
 
   const tick = (_t, dtMs) => {
     if (!visible) return;
     const dt = Math.min(dtMs / 1000, 0.05);
-    const kDot = 1 - Math.exp(-dt * 38);
-    const kRing = 1 - Math.exp(-dt * (reducedMotion ? 38 : 12));
-    dotPos.x += (mouse.x - dotPos.x) * kDot;
-    dotPos.y += (mouse.y - dotPos.y) * kDot;
-    ringPos.x += (mouse.x - ringPos.x) * kRing;
-    ringPos.y += (mouse.y - ringPos.y) * kRing;
-    ringScale += (ringScaleTarget - ringScale) * kRing;
-    dot.style.transform = `translate3d(${dotPos.x}px,${dotPos.y}px,0)`;
-    ring.style.transform = `translate3d(${ringPos.x}px,${ringPos.y}px,0) scale(${ringScale})`;
+    const k = 1 - Math.exp(-dt * (reducedMotion ? 60 : 26));
+    prev.x = pos.x;
+    prev.y = pos.y;
+    pos.x += (target.x - pos.x) * k;
+    pos.y += (target.y - pos.y) * k;
+
+    // stretch along the blob's own motion — liquid, only in dot mode
+    let sx = 1;
+    let sy = 1;
+    let ang = 0;
+    if (mode === 'default' && !reducedMotion) {
+      const vx = (pos.x - prev.x) / Math.max(dt, 0.001);
+      const vy = (pos.y - prev.y) / Math.max(dt, 0.001);
+      const speed = Math.hypot(vx, vy);
+      const s = Math.min(speed * 0.00042, 0.48);
+      sx = 1 + s;
+      sy = 1 / (1 + s * 0.75);
+      ang = (Math.atan2(vy, vx) * 180) / Math.PI;
+    }
+    blob.style.transform =
+      `translate3d(${pos.x}px,${pos.y}px,0) translate(-50%,-50%) ` +
+      `rotate(${ang.toFixed(1)}deg) scale(${(sx * press).toFixed(3)},${(sy * press).toFixed(3)})`;
+    // keep the label upright regardless of the blob's stretch rotation
+    if (mode === 'label') label.style.transform = `rotate(${(-ang).toFixed(1)}deg)`;
   };
   gsap.ticker.add(tick);
 
-  const onOver = (e) => {
-    const labelled = e.target.closest?.('[data-cursor]');
-    if (labelled) {
-      label.textContent = labelled.dataset.cursor;
-      rootEl.classList.add('has-label');
-      ringScaleTarget = 1.9;
-      return;
-    }
-    if (e.target.closest?.(INTERACTIVE)) {
-      ringScaleTarget = 1.45;
-    }
+  const resolveMode = (t) => {
+    if (!t || !t.closest) return setMode('default');
+    if (t.closest(TEXTY)) return setMode('text');
+    const labelled = t.closest('[data-cursor]');
+    if (labelled) return setMode('label', labelled.dataset.cursor);
+    if (t.closest(INTERACTIVE)) return setMode('link');
+    setMode('default');
   };
-  const onOut = (e) => {
-    if (!e.relatedTarget || !e.relatedTarget.closest?.(INTERACTIVE)) {
-      rootEl.classList.remove('has-label');
-      ringScaleTarget = 1;
-    } else if (!e.relatedTarget.closest?.('[data-cursor]')) {
-      rootEl.classList.remove('has-label');
-      ringScaleTarget = 1.45;
-    }
-  };
-  let preDownScale = 1;
+
+  const onOver = (e) => resolveMode(e.target);
   const onDown = () => {
-    preDownScale = ringScaleTarget;
-    ringScaleTarget *= 0.82;
+    press = 0.82;
   };
-  const onUp = () => (ringScaleTarget = preDownScale);
+  const onUp = () => {
+    press = 1;
+  };
   const onLeaveDoc = () => {
     visible = false;
-    gsap.to([dot, ring], { autoAlpha: 0, duration: 0.3 });
+    fadeTo(0);
   };
 
   window.addEventListener('pointermove', onMove, { passive: true });
   document.addEventListener('mouseover', onOver);
-  document.addEventListener('mouseout', onOut);
   window.addEventListener('pointerdown', onDown);
   window.addEventListener('pointerup', onUp);
   document.documentElement.addEventListener('mouseleave', onLeaveDoc);
+
+  gsap.set(blob, { width: SIZE.default, height: SIZE.default, opacity: 0 });
 
   return {
     kill() {
       gsap.ticker.remove(tick);
       window.removeEventListener('pointermove', onMove);
       document.removeEventListener('mouseover', onOver);
-      document.removeEventListener('mouseout', onOut);
       window.removeEventListener('pointerdown', onDown);
       window.removeEventListener('pointerup', onUp);
       document.documentElement.removeEventListener('mouseleave', onLeaveDoc);
+      document.documentElement.classList.remove('has-cursor');
     },
   };
 }

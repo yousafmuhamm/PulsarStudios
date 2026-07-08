@@ -58,7 +58,11 @@ export class Router {
       .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
       .catch(() => null);
 
-    await this.veil.cover();
+    // animation promises stall when the tab is backgrounded mid-gesture
+    // (rAF suspension freezes the gsap clock) — never let that wedge
+    // navigation: the veil just won't be seen if we proceed uncovered
+    const bounded = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(r, ms))]);
+    await bounded(this.veil.cover(), 1400);
     const html = await fetched;
     if (html === null) {
       location.href = path; // graceful fallback to a hard load
@@ -94,7 +98,10 @@ export class Router {
     ScrollTrigger.refresh();
 
     // reveal overlaps the new page's entrance
-    const revealDone = this.veil.reveal();
+    const revealDone = Promise.race([
+      this.veil.reveal(),
+      new Promise((r) => setTimeout(r, 1600)),
+    ]);
     this.page.enter();
     newMain.setAttribute('tabindex', '-1');
     newMain.focus({ preventScroll: true });

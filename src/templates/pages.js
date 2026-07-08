@@ -1,4 +1,10 @@
-import { shell, footer, em } from './chrome.js';
+// Node-only module (page generation). The dynamic import mirrors the
+// cache-bust query set by scripts/pages-plugin.js so dev-server edits to
+// chrome.js reach regenerated pages — a static import would pin the first
+// version in Node's ESM cache for the life of the process.
+const { shell, footer, em } = await import(
+  `./chrome.js?t=${globalThis.__pulsarGenT || 0}`
+);
 
 const img = (slug, variant, alt, cls = '', eager = false) =>
   `<img class="${cls}" src="/assets/img/projects/${slug}-${variant}.svg" alt="${alt}" ${
@@ -25,7 +31,7 @@ export function renderHome(projects) {
 
 <section class="intro" aria-label="What we do">
   <p class="mono eyebrow" data-reveal="fade">Bold ideas, built for the web</p>
-  <p class="intro__para" data-scrub-lines>We combine strategy, design, motion and engineering to build websites that feel alive. From startup launches to full brand platforms, we make work that gets attention &mdash; and converts it.</p>
+  <p class="intro__para" data-scrub-words data-skew>We combine strategy, design, motion and engineering to build websites that feel alive. From startup launches to full brand platforms, we make work that gets attention &mdash; and converts it.</p>
   <p data-reveal="fade"><a class="link-draw intro__cta" href="/about.html">Our approach &rarr;</a></p>
 </section>
 
@@ -58,15 +64,15 @@ export function renderHome(projects) {
 </section>
 
 <section class="philosophy section--dark" data-philosophy aria-label="Philosophy">
-  <h2 class="philosophy__title" data-reveal="lines">Where good ideas become great websites</h2>
+  <h2 class="philosophy__title" data-reveal="lines" data-skew>Where good ideas become great websites</h2>
   <div class="philosophy__cols">
     <p data-reveal="fade">Templates are how brands disappear. Every project here starts from a blank canvas and one hard question: what should this feel like, and why should anyone care? Strategy shapes the answer. Craft makes it undeniable.</p>
     <p data-reveal="fade">Designers and engineers share a desk at Pulsar &mdash; motion, code and copy are decided together, never thrown over a wall. What comes out the other side is fast, alive, and impossible to mistake for anyone else&rsquo;s work.</p>
   </div>
   <div class="philosophy__kickers">
-    <p class="philosophy__kicker" data-reveal="lines">Step into a new world</p>
-    <p class="philosophy__kicker" data-reveal="lines">and let your</p>
-    <p class="philosophy__kicker philosophy__kicker--accent" data-reveal="lines">imagination run wild</p>
+    <p class="philosophy__kicker" data-reveal="lines" data-drift-x="9">Step into a new world</p>
+    <p class="philosophy__kicker philosophy__kicker--indent" data-reveal="lines" data-drift-x="-7">and let your</p>
+    <p class="philosophy__kicker philosophy__kicker--accent" data-reveal="lines" data-drift-x="12">imagination run wild</p>
   </div>
 </section>
 ${footer({ nextHref: '/about.html', nextLabel: 'About Us' })}`;
@@ -158,7 +164,8 @@ export function renderAbout() {
 </section>
 
 <section class="team" aria-label="The team">
-  <p class="intro__para team__manifesto" data-scrub-lines>A tight team of designers, developers and motion nerds turning ambitious ideas into websites people remember.</p>
+  <h2 class="sr-only">The team</h2>
+  <p class="intro__para team__manifesto" data-scrub-words data-skew>A tight team of designers, developers and motion nerds turning ambitious ideas into websites people remember.</p>
   <div class="team__carousel" data-team-carousel data-cursor="Drag" tabindex="0" role="group" aria-label="Team members — drag or scroll horizontally">
     ${TEAM.map(
       (t) => `<article class="team-card">
@@ -241,7 +248,7 @@ export function renderProjectsList(projects) {
     <h1 class="plist__title mono" data-reveal-load="chars">PROJECTS &mdash; 0${projects.length}</h1>
     <p class="plist__sub" data-reveal-load="lines">Every launch is a case study in attention. Here are ${projects.length} of ours.</p>
   </header>
-  <ul class="plist__rows" data-plist>
+  <ul class="plist__rows" data-plist data-skew>
     ${projects
       .map(
         (p, i) => `<li class="prow" data-reveal="fade">
@@ -291,7 +298,7 @@ export function renderProjectDetail(p, projects, i) {
 
   <section class="case__block">
     <p class="mono eyebrow" data-reveal="fade">The brief</p>
-    <p class="case__para" data-scrub-lines>${em(p.brief)}</p>
+    <p class="case__para" data-scrub-words data-skew>${em(p.brief)}</p>
   </section>
 
   <figure class="case__img case__img--left" data-parallax-img>
@@ -300,7 +307,7 @@ export function renderProjectDetail(p, projects, i) {
 
   <section class="case__block case__block--right">
     <p class="mono eyebrow" data-reveal="fade">What we did</p>
-    <p class="case__para" data-scrub-lines>${em(p.approach)}</p>
+    <p class="case__para" data-scrub-words data-skew>${em(p.approach)}</p>
   </section>
 
   <figure class="case__img case__img--right" data-parallax-img>

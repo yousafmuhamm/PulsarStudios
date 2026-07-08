@@ -28,7 +28,9 @@ class GL {
       this.renderer = new THREE.WebGLRenderer({
         canvas,
         alpha: true,
-        antialias: !lowPower,
+        // MSAA only pays off when drawing straight to screen — under the
+        // post pipeline every scene renders into a target, so skip it there
+        antialias: !lowPower && !POST_ENABLED,
         powerPreference: 'high-performance',
       });
     } catch {
@@ -58,7 +60,10 @@ class GL {
   }
 
   setSize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, lowPower ? 1.5 : 2);
+    // the post pipeline pushes every pixel through 6 passes — cap DPR
+    // tighter there (bloom hides the difference completely)
+    const cap = POST_ENABLED ? 1.6 : lowPower ? 1.5 : 2;
+    const dpr = Math.min(window.devicePixelRatio || 1, cap);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(window.innerWidth, window.innerHeight, false);
     if (this.post) this.post.resize(window.innerWidth, window.innerHeight);
@@ -73,12 +78,24 @@ class GL {
 
   add(scene) {
     if (!this.renderer) return;
-    this.scenes.add(scene);
     scene.resize(window.innerWidth, window.innerHeight);
-    if (reducedMotion) this.renderOnce();
+    // Compile shaders off the main thread (KHR_parallel_shader_compile)
+    // before the scene joins the render loop, so the first frame never
+    // blocks on synchronous program linking.
+    const mount = () => {
+      if (scene._removed) return;
+      this.scenes.add(scene);
+      if (reducedMotion) this.renderOnce();
+    };
+    if (!reducedMotion && scene.scene && scene.camera && this.renderer.compileAsync) {
+      this.renderer.compileAsync(scene.scene, scene.camera).then(mount, mount);
+    } else {
+      mount();
+    }
   }
 
   remove(scene) {
+    scene._removed = true;
     this.scenes.delete(scene);
     scene.dispose();
     if (!this.scenes.size && this.renderer) {

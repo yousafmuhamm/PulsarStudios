@@ -87,7 +87,7 @@ function makeRT(w, h, extra = {}) {
 }
 
 export function createPost(renderer) {
-  const BLOOM_SCALE = 0.5;
+  const BLOOM_SCALE = 0.4; // bloom is inherently soft — quarter-ish res is plenty
 
   // fullscreen triangle
   const geo = new THREE.BufferGeometry();

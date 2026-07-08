@@ -149,9 +149,8 @@ export function preChrome() {
 
 export function postChrome() {
   return `
-<div class="cursor" data-cursor aria-hidden="true">
-  <div class="cursor__ring" data-cursor-ring><span class="cursor__label" data-cursor-label></span></div>
-  <div class="cursor__dot" data-cursor-dot></div>
+<div class="cursor" data-cursor-root aria-hidden="true">
+  <div class="cursor__blob" data-cursor-blob><span class="cursor__label" data-cursor-label></span></div>
 </div>`;
 }
 

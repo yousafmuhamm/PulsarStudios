@@ -3,7 +3,7 @@
  * menu, contact, reel, veil) → router → preloader → first page enter.
  */
 import './styles/main.scss';
-import { ScrollTrigger, initScroll } from './core.js';
+import { gsap, ScrollTrigger, initScroll } from './core.js';
 import { isTouch, reducedMotion } from './utils/env.js';
 import { glx } from './gl/renderer.js';
 import { createVeil } from './gl/transitions.js';
@@ -26,19 +26,46 @@ grain.className = 'grain';
 grain.setAttribute('aria-hidden', 'true');
 document.body.appendChild(grain);
 
-initScroll();
-glx.init(document.querySelector('[data-gl]'));
+// Boot is spread across macrotasks so no single task blocks the main
+// thread for long (TBT); the preloader covers the screen throughout.
+const nextTask = () => new Promise((r) => setTimeout(r, 0));
 
-initCursor();
-magnetize(document); // header/menu chrome (page content re-scans on navigation)
-initMenu();
-initContact();
-initReel();
+async function boot() {
+  initScroll();
+  const preloaderDone = runPreloader();
 
-const router = new Router({ veil: createVeil() });
-const page = router.start();
+  await nextTask();
+  glx.init(document.querySelector('[data-gl]'));
 
-runPreloader().then(() => {
+  await nextTask();
+  initCursor();
+  magnetize(document); // header/menu chrome (page content re-scans on navigation)
+  initMenu();
+  initContact();
+  initReel();
+
+  // Text splits measure line breaks — wait for the real fonts (bounded)
+  // so masks are built against final metrics, not the fallback face.
+  await Promise.race([
+    document.fonts ? document.fonts.ready : Promise.resolve(),
+    new Promise((r) => setTimeout(r, 1200)),
+  ]);
+
+  await nextTask();
+  const router = new Router({ veil: createVeil() });
+  const page = router.start();
+
+  if (import.meta.env.DEV) {
+    // QA hooks: leak checks + tween inspection across navigations.
+    // NB: must be the instances from core.js — a dynamic import('gsap')
+    // would create a second gsap whose ticker never runs.
+    window.__ST = ScrollTrigger;
+    window.__gsap = gsap;
+  }
+
+  await preloaderDone;
   ScrollTrigger.refresh();
   page.enter();
-});
+}
+
+boot();

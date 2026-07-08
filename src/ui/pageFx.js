@@ -4,6 +4,7 @@
  */
 import { gsap, ScrollTrigger, scrollY, scrollLimit } from '../core.js';
 import { initMarquees } from '../anims/marquee.js';
+import { initVelocitySkew } from '../anims/velocity.js';
 import { reducedMotion } from '../utils/env.js';
 
 const ADVANCE_THRESHOLD = 950; // accumulated px of deliberate extra scroll
@@ -13,6 +14,9 @@ export function initPageFx(main) {
 
   const marquees = initMarquees(main);
   kills.push(() => marquees.forEach((m) => m.kill()));
+
+  const skew = initVelocitySkew(main);
+  if (skew) kills.push(() => skew.kill());
 
   // page scroll progress line (hero)
   const prog = main.querySelector('[data-scroll-progress]');

@@ -47,9 +47,11 @@ export class Split {
     this.el = el;
     this.type = type;
     this.original = el.innerHTML;
-    if (!el.getAttribute('aria-label')) {
-      el.setAttribute('aria-label', el.textContent.replace(/\s+/g, ' ').trim());
-    }
+    // aria-label is prohibited on generic elements (p/span), so AT gets a
+    // visually-hidden copy of the text and the animated spans are hidden.
+    this.srText = document.createElement('span');
+    this.srText.className = 'sr-only';
+    this.srText.textContent = el.textContent.replace(/\s+/g, ' ').trim();
     this.split();
   }
 
@@ -117,6 +119,7 @@ export class Split {
       });
     }
 
+    el.appendChild(this.srText);
     el.classList.add('is-split');
   }
 

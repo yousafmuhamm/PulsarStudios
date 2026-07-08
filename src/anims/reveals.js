@@ -4,7 +4,9 @@
  *   data-reveal="lines|words|chars|fade|image"  masked reveal at 'top 80%'
  *   data-reveal-load="..."                      same, but part of the page-enter timeline
  *   data-scrub-lines                            long paragraph, line-by-line scrubbed
+ *   data-scrub-words                            word-by-word opacity fill, scrubbed
  *   data-cta-fill                               char-by-char colour fill, scrubbed
+ *   data-drift-x="8"                            horizontal drift, scrubbed across viewport
  *   data-counter="48"                           count-up once in view
  *   data-parallax="-10"                         yPercent scrub against its section
  *   data-parallax-img                           clip-open once + inner image parallax
@@ -36,7 +38,10 @@ export class RevealManager {
 
     if (reducedMotion) {
       // simple fades only — no splits, no scrubs, nothing masked
-      qsa('[data-reveal], [data-reveal-load], [data-scrub-lines], [data-cta-fill]', root).forEach(
+      qsa(
+        '[data-reveal], [data-reveal-load], [data-scrub-lines], [data-scrub-words], [data-cta-fill]',
+        root
+      ).forEach(
         (el) => {
           gsap.set(el, { visibility: 'visible' });
           gsap.from(el, {
@@ -60,7 +65,9 @@ export class RevealManager {
       this.addReveal(el, el.dataset.revealLoad, true)
     );
     qsa('[data-scrub-lines]', root).forEach((el) => this.addScrubLines(el));
+    qsa('[data-scrub-words]', root).forEach((el) => this.addScrubWords(el));
     qsa('[data-cta-fill]', root).forEach((el) => this.addCtaFill(el));
+    qsa('[data-drift-x]', root).forEach((el) => this.addDriftX(el));
     qsa('[data-counter]', root).forEach((el) => this.addCounter(el));
     qsa('[data-parallax]', root).forEach((el) => this.addParallax(el));
     qsa('[data-parallax-img]', root).forEach((el) => this.addParallaxImg(el));
@@ -138,6 +145,45 @@ export class RevealManager {
     make();
     entry.remake = make;
     this.entries.push(entry);
+  }
+
+  /* Lusion-style paragraph: every word fades from ghost to full ink as
+     the reader scrolls through it — reading pace = scroll pace. */
+  addScrubWords(el) {
+    const entry = { el, kind: 'scrub-words' };
+    const make = () => {
+      entry.split = new Split(el, 'words');
+      const words = entry.split.targets();
+      gsap.set(words, { opacity: 0.12 });
+      el.classList.add('is-ready');
+      entry.tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: el,
+          start: 'top 86%',
+          end: 'top 30%',
+          scrub: 0.5,
+        },
+      });
+      entry.tl.to(words, { opacity: 1, stagger: 0.08, ease: 'none' });
+    };
+    make();
+    entry.remake = make;
+    this.entries.push(entry);
+  }
+
+  /* horizontal drift scrubbed across the viewport (philosophy kickers) */
+  addDriftX(el) {
+    const amount = parseFloat(el.dataset.driftX) || 8;
+    const tl = gsap.fromTo(
+      el,
+      { xPercent: amount },
+      {
+        xPercent: -amount * 0.4,
+        ease: 'none',
+        scrollTrigger: { trigger: el, start: 'top bottom', end: 'bottom top', scrub: true },
+      }
+    );
+    this.entries.push({ el, kind: 'drift-x', tl });
   }
 
   addCtaFill(el) {
@@ -237,7 +283,7 @@ export class RevealManager {
           entry.tl.kill();
         }
         entry.split.revert();
-        if (entry.kind === 'scrub-lines' || entry.kind === 'cta-fill') {
+        if (entry.kind === 'scrub-lines' || entry.kind === 'scrub-words' || entry.kind === 'cta-fill') {
           entry.remake();
         } else if (entry.played || entry.onLoad) {
           // already shown — resplit and pin to final state

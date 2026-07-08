@@ -17,6 +17,11 @@ export function initContact() {
   let lastFocus = null;
   const dur = reducedMotion ? 0 : 1;
 
+  // The stylesheet parks the panel with `transform: translateX(102%)`,
+  // which GSAP would cache as a *pixel* x — normalise it to xPercent
+  // once so the open/close tweens fully control the position.
+  gsap.set(panel, { x: 0, xPercent: 102 });
+
   const doOpen = () => {
     if (open) return;
     open = true;
@@ -26,12 +31,8 @@ export function initContact() {
     panel.setAttribute('aria-hidden', 'false');
     panel.style.visibility = 'visible';
     scrim.hidden = false;
-    gsap.to(scrim, { opacity: 1, duration: 0.4 * dur });
-    gsap.fromTo(
-      panel,
-      { xPercent: 102 },
-      { xPercent: 0, duration: 0.7 * dur, ease: 'expo.out' }
-    );
+    gsap.to(scrim, { opacity: 1, duration: 0.4 * dur, overwrite: 'auto' });
+    gsap.to(panel, { xPercent: 0, duration: 0.7 * dur, ease: 'expo.out', overwrite: 'auto' });
     panel.querySelector('input')?.focus({ preventScroll: true });
   };
 
@@ -44,9 +45,15 @@ export function initContact() {
       xPercent: 102,
       duration: 0.55 * d,
       ease: 'expo.inOut',
+      overwrite: 'auto',
       onComplete: () => (panel.style.visibility = 'hidden'),
     });
-    gsap.to(scrim, { opacity: 0, duration: 0.4 * d, onComplete: () => (scrim.hidden = true) });
+    gsap.to(scrim, {
+      opacity: 0,
+      duration: 0.4 * d,
+      overwrite: 'auto',
+      onComplete: () => (scrim.hidden = true),
+    });
     unlockScroll();
     if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true });
   };

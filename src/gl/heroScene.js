@@ -35,7 +35,9 @@ export function createHeroScene() {
   const group = new THREE.Group();
   scene.add(group);
 
-  const segs = lowPower ? 48 : 110;
+  // 72 segments is visually identical after bloom at these sizes and cuts
+  // the vertex-noise workload by ~60% vs the original 110
+  const segs = lowPower ? 40 : 72;
   const geometry = new THREE.SphereGeometry(1, segs, segs);
 
   const count = lowPower ? 2 : BLOBS.length;
@@ -81,13 +83,46 @@ export function createHeroScene() {
   const pointerWorld = new THREE.Vector3(999, 999, 0);
   const rayVec = new THREE.Vector3();
   let pointerActive = false;
+  let pointerSpeed = 0; // smoothed, ~0..2 — fast swipes push blobs harder
+  let lastPX = 0;
+  let lastPY = 0;
+  let lastPT = 0;
+  let burst = 0; // click shockwave, decays each frame
 
   const onPointer = (e) => {
     pointerNdc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+    const now = performance.now();
+    if (lastPT) {
+      const dt = Math.max(now - lastPT, 8);
+      const d = Math.hypot(e.clientX - lastPX, e.clientY - lastPY) / dt; // px per ms
+      pointerSpeed += (Math.min(d * 1.4, 2) - pointerSpeed) * 0.18;
+    }
+    lastPX = e.clientX;
+    lastPY = e.clientY;
+    lastPT = now;
     pointerActive = true;
   };
+
+  // press anywhere in the hero → radial shockwave: blobs kick away from
+  // the click and the pulse flashes, like tapping the surface of a pond
+  const onDown = (e) => {
+    if (state.opacity < 0.05) return; // hero not visible (scrolled past)
+    if (e.target.closest('a, button, [data-magnetic]')) return;
+    onPointer(e);
+    updatePointerWorld();
+    blobs.forEach((b) => {
+      tmp.copy(b.pos).sub(pointerWorld);
+      tmp.z = 0;
+      const d = Math.max(tmp.length(), 0.35);
+      tmp.normalize().multiplyScalar(Math.min(5.5 / d, 4.5));
+      b.vel.add(tmp);
+    });
+    burst = 1;
+  };
+
   if (!lowPower && !reducedMotion) {
     window.addEventListener('pointermove', onPointer, { passive: true });
+    window.addEventListener('pointerdown', onDown, { passive: true });
   }
 
   const updatePointerWorld = () => {
@@ -133,11 +168,16 @@ export function createHeroScene() {
     render(_gsapTime, dt) {
       time += dt;
 
-      // pulsar beat
+      // pulsar beat + click shockwave flash
       const phase = (time % PULSE_PERIOD) / PULSE_PERIOD;
-      const pulse = Math.exp(-5.2 * phase) + 0.18 * Math.exp(-26 * phase);
+      let pulse = Math.exp(-5.2 * phase) + 0.18 * Math.exp(-26 * phase);
+      if (burst > 0.001) {
+        pulse = Math.min(pulse + burst * 0.85, 1.4);
+        burst *= Math.exp(-4.2 * dt);
+      }
 
       if (pointerActive) updatePointerWorld();
+      pointerSpeed *= Math.exp(-1.6 * dt); // settle when the cursor rests
 
       // physics
       const clampedDt = Math.min(dt, 1 / 30);
@@ -152,9 +192,12 @@ export function createHeroScene() {
           tmp.copy(b.pos).sub(pointerWorld);
           tmp.z = 0;
           const d = tmp.length();
-          const R = b.cfg.r + 1.5;
+          // fast swipes reach further and push harder — the cluster
+          // scatters when you slash through it, barely stirs when you drift
+          const boost = 1 + pointerSpeed * 1.1;
+          const R = (b.cfg.r + 1.5) * (1 + pointerSpeed * 0.35);
           if (d < R && d > 0.001) {
-            b.vel.addScaledVector(tmp.normalize(), (1 - d / R) * 13 * clampedDt);
+            b.vel.addScaledVector(tmp.normalize(), (1 - d / R) * 13 * boost * clampedDt);
           }
         }
 
@@ -181,6 +224,13 @@ export function createHeroScene() {
       group.position.y = state.y;
       group.scale.setScalar(state.scale);
 
+      // parallax tilt — the whole cluster leans gently toward the cursor
+      if (pointerActive) {
+        const k = 1 - Math.exp(-3 * dt);
+        group.rotation.y += (pointerNdc.x * 0.16 - group.rotation.y) * k;
+        group.rotation.x += (-pointerNdc.y * 0.1 - group.rotation.x) * k;
+      }
+
       blobs.forEach((b) => {
         b.mesh.position.copy(b.pos);
         b.material.uniforms.uTime.value = time;
@@ -193,6 +243,7 @@ export function createHeroScene() {
 
     dispose() {
       window.removeEventListener('pointermove', onPointer);
+      window.removeEventListener('pointerdown', onDown);
       geometry.dispose();
       blobs.forEach((b) => b.material.dispose());
     },

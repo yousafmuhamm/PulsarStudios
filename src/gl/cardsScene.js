@@ -67,6 +67,7 @@ export function createCardsScene(els) {
         uShift: { value: new THREE.Vector2() },
         uSize: { value: new THREE.Vector2(1, 1) },
         uRadius: { value: 6 },
+        uParallax: { value: 0 },
       },
     });
     const mesh = new THREE.Mesh(geometry, material);
@@ -140,6 +141,13 @@ export function createCardsScene(els) {
         p.material.uniforms.uTime.value += dt;
         p.material.uniforms.uSize.value.set(r.width, r.height);
         p.material.uniforms.uShift.value.set(shift.x * 0.045, shift.y * 0.03);
+        // inner-image parallax: the photo pans as its card travels across
+        // the viewport (horizontal work section + vertical scroll alike)
+        p.material.uniforms.uParallax.value = gsap.utils.clamp(
+          -1,
+          1,
+          (r.left + r.width / 2 - vw / 2) / (vw * 0.5)
+        );
       });
       if (any) glx.renderer.render(scene, camera);
     },

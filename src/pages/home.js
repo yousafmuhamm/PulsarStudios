@@ -12,6 +12,7 @@ import { isTouch, reducedMotion, qsa } from '../utils/env.js';
 export function createHomePage(main) {
   let hero = null;
   let cards = null;
+  let killGlow = null;
 
   // opacity choreography: intro × scroll fade, overridden by the ghost pass
   const intro = { v: 0 };
@@ -29,7 +30,7 @@ export function createHomePage(main) {
       const track = main.querySelector('[data-work-track]');
       if (pin && track && !isTouch && !reducedMotion) {
         const dist = () => Math.max(0, track.scrollWidth - window.innerWidth);
-        gsap.to(track, {
+        const scrollTween = gsap.to(track, {
           x: () => -dist(),
           ease: 'none',
           scrollTrigger: {
@@ -42,6 +43,56 @@ export function createHomePage(main) {
             invalidateOnRefresh: true,
           },
         });
+
+        // cards rise + settle as they come in from the right of the
+        // horizontal track (containerAnimation maps triggers to track x)
+        qsa('.work-card', main).forEach((card) => {
+          gsap.from(card, {
+            y: 90,
+            rotation: 2.5,
+            duration: 1,
+            ease: 'power3.out',
+            scrollTrigger: {
+              trigger: card,
+              containerAnimation: scrollTween,
+              start: 'left 95%',
+              once: true,
+            },
+          });
+        });
+      }
+
+      // hero glow follows the cursor (drives the ::before radial-gradient)
+      const heroEl = main.querySelector('[data-hero]');
+      if (heroEl && !isTouch && !reducedMotion) {
+        const cur = { x: 68, y: 42 };
+        const target = { x: 68, y: 42 };
+        const onMove = (e) => {
+          target.x = (e.clientX / window.innerWidth) * 100;
+          target.y = (e.clientY / window.innerHeight) * 100;
+        };
+        let wx = -1;
+        let wy = -1;
+        const glowTick = () => {
+          cur.x += (target.x - cur.x) * 0.05;
+          cur.y += (target.y - cur.y) * 0.05;
+          // custom-property writes repaint the whole hero gradient — only
+          // touch style when the value moved a visible amount
+          const qx = Math.round(cur.x * 4) / 4;
+          const qy = Math.round(cur.y * 4) / 4;
+          if (qx !== wx || qy !== wy) {
+            wx = qx;
+            wy = qy;
+            heroEl.style.setProperty('--hx', qx + '%');
+            heroEl.style.setProperty('--hy', qy + '%');
+          }
+        };
+        window.addEventListener('pointermove', onMove, { passive: true });
+        gsap.ticker.add(glowTick);
+        killGlow = () => {
+          window.removeEventListener('pointermove', onMove);
+          gsap.ticker.remove(glowTick);
+        };
       }
 
       hero = createHeroScene();
@@ -57,7 +108,7 @@ export function createHomePage(main) {
             trigger: heroEl,
             start: 'top top',
             end: 'bottom top',
-            scrub: true,
+            scrub: 0.6, // smoothing on the handoff — the cluster drifts, never snaps
             onUpdate: (self) => {
               scrollP = self.progress;
               hero.state.y = -scrollP * 3.4;
@@ -90,16 +141,20 @@ export function createHomePage(main) {
 
     enter() {
       if (hero && !reducedMotion) {
+        // the cluster is already breathing in while the words reveal, so
+        // the page arrives "alive" instead of assembling piece by piece
         gsap.fromTo(
           hero.state,
-          { scale: 0.68 },
-          { scale: 1, duration: 1.8, ease: 'expo.out', delay: 0.05 }
+          { scale: 0.62 },
+          { scale: 1, duration: 2.4, ease: 'expo.out' }
         );
-        gsap.to(intro, { v: 1, duration: 1.4, ease: 'power2.out', delay: 0.05, onUpdate: applyOpacity });
+        gsap.to(intro, { v: 1, duration: 1.1, ease: 'power2.out', onUpdate: applyOpacity });
       }
     },
 
     destroy() {
+      killGlow?.();
+      killGlow = null;
       if (hero) {
         glx.remove(hero);
         hero = null;

@@ -104,9 +104,10 @@ precision highp float;
 uniform sampler2D uMap;
 uniform float uHover;
 uniform float uTime;
-uniform vec2 uShift;   // rgb-shift vector (uv space), driven by cursor velocity
-uniform vec2 uSize;    // plane size in px
-uniform float uRadius; // corner radius in px
+uniform vec2 uShift;    // rgb-shift vector (uv space), driven by cursor velocity
+uniform vec2 uSize;     // plane size in px
+uniform float uRadius;  // corner radius in px
+uniform float uParallax; // -1..1, card centre relative to viewport centre
 varying vec2 vUv;
 
 float roundedMask(vec2 uv, vec2 size, float r) {
@@ -119,6 +120,10 @@ float roundedMask(vec2 uv, vec2 size, float r) {
 
 void main() {
   vec2 uv = vUv;
+  // base zoom leaves sampling margin for the parallax pan + hover zoom-in
+  float zoom = 1.12 + 0.07 * uHover;
+  uv = (uv - 0.5) / zoom + 0.5;
+  uv.x += uParallax * 0.05;
   float w1 = sin(uv.y * 6.283 + uTime * 2.1);
   float w2 = sin(uv.y * 14.0 - uTime * 3.3 + uv.x * 4.0);
   uv.x += (w1 * 0.6 + w2 * 0.4) * 0.035 * uHover;

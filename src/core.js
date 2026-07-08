@@ -18,7 +18,7 @@ export function initScroll() {
   if (reducedMotion) return null; // native scroll, simple fades elsewhere
   lenis = new Lenis({
     autoRaf: false,
-    lerp: 0.105,
+    lerp: 0.09, // a touch more float — silkier glide without feeling laggy
     wheelMultiplier: 1,
   });
   lenis.on('scroll', ScrollTrigger.update);
