@@ -75,6 +75,18 @@
 - [ ] **Step 4: Verify** — temporarily wire `oglRenderer` as the active renderer in `main.js` (feature-flag), build, `npm run preview`, and visually confirm bloom glow matches `visual-baseline/home-desktop.png`. Then revert the flag.
 - [ ] **Step 5:** Commit: `refactor: port bloom post-processing to OGL`.
 
+## Scene-Target Contract (CRITICAL — decided after Task B, binds Tasks C, D, E)
+
+**The problem:** In Three.js, `post.begin()` binds the scene render target as ambient state and each scene's `renderer.render(scene, camera)` draws into it. In OGL, `renderer.render({scene, camera})` defaults `target: null` (screen) and rebinds the framebuffer — so an OGL scene that omits `target` renders to SCREEN, bypassing bloom and breaking the post sandwich. `oglPost.begin()` does bind `sceneRT`, but the scene's own `renderer.render()` call will override that binding unless it passes the target explicitly.
+
+**The contract (all ported scenes MUST follow this):**
+- `glx` (in `oglRenderer.js`) exposes the current scene render target: add a getter/property `glx.sceneTarget` that returns `this.post ? this.post.sceneRT : null` (post must expose `sceneRT` on its returned API — add `sceneRT: () => sceneRT` or a getter to `oglPost`'s return object). When post is disabled (lowPower/reducedMotion), `sceneTarget` is `null` = render to screen.
+- The scene `render(time, dt)` method calls: `renderer.render({ scene, camera, target: glx.sceneTarget, clear: false })`. Passing `target: null` when post is off renders to screen (correct); passing `sceneRT` when post is on renders into the bloom input (correct). `clear: false` because `post.begin()` already cleared the target (and multiple scenes share it — only the first clears).
+- **Do NOT let scenes call `renderer.render()` without the explicit `target`.** That is the single most important rule of the scene ports.
+- `oglRenderer.js` tick already calls `post.begin()` → scenes → `post.end()`. No change needed there beyond exposing `sceneTarget`. The `post.begin()` clear stays.
+
+This contract was verified against OGL 1.0.11 `Renderer.render()` (defaults target null, always calls bindFramebuffer). Task E's final wiring depends on it.
+
 ## Task C: Port the hero blob scene to OGL
 
 **Files:**
