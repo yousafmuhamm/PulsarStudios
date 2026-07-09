@@ -49,6 +49,18 @@ float snoise(vec3 v){
 }`;
 
 export const blobVertex = /* glsl */ `
+precision highp float;
+// OGL (unlike Three.js) does not textually inject built-in attribute/uniform
+// declarations into shader source — it only supplies their values at draw
+// time (see OGL Mesh.draw()/NormalProgram.js). Three.js auto-prepends these,
+// so this block was implicit under the old renderer; declaring them here
+// keeps the GLSL logic below byte-identical while satisfying OGL's compiler.
+attribute vec3 position;
+attribute vec3 normal;
+uniform mat4 modelMatrix;
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+uniform mat3 normalMatrix;
 uniform float uTime;
 uniform float uPulse;
 uniform float uAmp;

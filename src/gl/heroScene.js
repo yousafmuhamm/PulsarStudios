@@ -5,21 +5,21 @@
  *
  * Exposes `state` { y, scale, opacity } so the page module can
  * choreograph the scroll handoff and the philosophy "ghost" pass.
+ *
+ * OGL port (Task C): class-for-class swap from Three.js. See
+ * docs/superpowers/plans/2026-07-09-ogl-port-subplan.md — "Scene-Target
+ * Contract" — render() must draw into glx.sceneTarget, not the screen.
  */
-import { glx } from './renderer.js';
-import {
-  Color, Scene, PerspectiveCamera, Group, SphereGeometry, ShaderMaterial,
-  Mesh, Vector3, Vector2,
-} from './three.js';
+import { glx, OGL } from './oglRenderer.js';
 import { blobVertex, blobFragment } from './shaders.js';
 import { lenis } from '../core.js';
 import { lowPower, reducedMotion } from '../utils/env.js';
 
 const PULSE_PERIOD = 2.4;
 
-const COL_A = new Color('#6533FF');
-const COL_B = new Color('#31C6E8');
-const COL_EDGE = new Color('#B8FF2C');
+const COL_A = new OGL.Color('#6533FF');
+const COL_B = new OGL.Color('#31C6E8');
+const COL_EDGE = new OGL.Color('#B8FF2C');
 
 // home positions as fractions of half-viewport (x right of centre), radius in world units
 const BLOBS = [
@@ -33,17 +33,19 @@ const BLOBS = [
 export function createHeroScene() {
   if (!glx.ok) return null;
 
-  const scene = new Scene();
-  const camera = new PerspectiveCamera(34, 1, 0.1, 40);
+  const gl = glx.renderer.gl;
+
+  const scene = new OGL.Transform();
+  const camera = new OGL.Camera(gl, { fov: 34, aspect: 1, near: 0.1, far: 40 });
   camera.position.z = 8;
 
-  const group = new Group();
-  scene.add(group);
+  const group = new OGL.Transform();
+  group.setParent(scene);
 
   // 72 segments is visually identical after bloom at these sizes and cuts
   // the vertex-noise workload by ~60% vs the original 110
   const segs = lowPower ? 40 : 72;
-  const geometry = new SphereGeometry(1, segs, segs);
+  const geometry = new OGL.Sphere(gl, { radius: 1, widthSegments: segs, heightSegments: segs });
 
   const count = lowPower ? 2 : BLOBS.length;
   const blobs = [];
@@ -52,11 +54,21 @@ export function createHeroScene() {
 
   for (let i = 0; i < count; i++) {
     const cfg = BLOBS[i];
-    const material = new ShaderMaterial({
-      vertexShader: blobVertex,
-      fragmentShader: blobFragment,
+    const material = new OGL.Program(gl, {
+      vertex: blobVertex,
+      fragment: blobFragment,
       transparent: true,
       depthWrite: false,
+      // Three's ShaderMaterial defaults `side: THREE.FrontSide` (back-face
+      // culled) even though the original never set `side` explicitly.
+      // OGL's Program also defaults cullFace to gl.BACK, so simply not
+      // passing cullFace here matches Three's default. Explicitly passing
+      // `cullFace:false` (as the API translation table's generic example
+      // suggested) was wrong for this material: with depthWrite:false the
+      // sphere's back faces then blended on top of the front faces every
+      // frame, roughly doubling the alpha/color contribution per pixel and
+      // washing the blobs out to near-white (Task C finding — this was the
+      // main visual-fidelity bug, not a positioning or color-uniform issue).
       uniforms: {
         uTime: { value: 0 },
         uPulse: { value: 0 },
@@ -70,24 +82,36 @@ export function createHeroScene() {
         uHueShift: { value: i / count },
       },
     });
-    const mesh = new Mesh(geometry, material);
-    mesh.scale.setScalar(cfg.r);
-    group.add(mesh);
+    // OGL's Program picks its transparent blend func from the renderer's
+    // premultipliedAlpha flag: (ONE, ONE_MINUS_SRC_ALPHA) when true, assuming
+    // the fragment shader already outputs col*alpha. blobFragment outputs
+    // straight (non-premultiplied) color — `vec4(col, alpha)` — matching
+    // Three's NormalBlending, which always uses (SRC_ALPHA,
+    // ONE_MINUS_SRC_ALPHA) for ShaderMaterial regardless of the renderer's
+    // canvas-level premultipliedAlpha setting (that flag only affects how
+    // Three composites the *canvas* against the page, not per-material
+    // blending). Without this override, overlapping front/back-lit regions
+    // of each sphere accumulate near-full color on every blend, washing the
+    // whole cluster out to white (Task C finding).
+    material.setBlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    const mesh = new OGL.Mesh(gl, { geometry, program: material });
+    mesh.scale.set(cfg.r, cfg.r, cfg.r);
+    mesh.setParent(group);
     blobs.push({
       cfg,
       mesh,
       material,
-      pos: new Vector3(),
-      vel: new Vector3(),
-      home: new Vector3(),
+      pos: new OGL.Vec3(),
+      vel: new OGL.Vec3(),
+      home: new OGL.Vec3(),
       phase: i * 2.1,
     });
   }
 
   /* ---------------------------------------------------------- pointer */
-  const pointerNdc = new Vector2(10, 10); // offscreen
-  const pointerWorld = new Vector3(999, 999, 0);
-  const rayVec = new Vector3();
+  const pointerNdc = new OGL.Vec2(10, 10); // offscreen
+  const pointerWorld = new OGL.Vec3(999, 999, 0);
+  const rayVec = new OGL.Vec3();
   let pointerActive = false;
   let pointerSpeed = 0; // smoothed, ~0..2 — fast swipes push blobs harder
   let lastPX = 0;
@@ -119,8 +143,8 @@ export function createHeroScene() {
     blobs.forEach((b) => {
       tmp.copy(b.pos).sub(pointerWorld);
       tmp.z = 0;
-      const d = Math.max(tmp.length(), 0.35);
-      tmp.normalize().multiplyScalar(Math.min(5.5 / d, 4.5));
+      const d = Math.max(tmp.len(), 0.35);
+      tmp.normalize().multiply(Math.min(5.5 / d, 4.5));
       b.vel.add(tmp);
     });
     burst = 1;
@@ -133,16 +157,19 @@ export function createHeroScene() {
 
   const updatePointerWorld = () => {
     // ray from camera through NDC, intersected with the z=0 plane
-    rayVec.set(pointerNdc.x, pointerNdc.y, 0.5).unproject(camera).sub(camera.position).normalize();
+    rayVec.set(pointerNdc.x, pointerNdc.y, 0.5);
+    camera.unproject(rayVec);
+    rayVec.sub(camera.position).normalize();
     const t = -camera.position.z / rayVec.z;
-    pointerWorld.copy(camera.position).addScaledVector(rayVec, t);
+    pointerWorld.copy(camera.position).add(tmpScaled.copy(rayVec).multiply(t));
   };
 
   /* ------------------------------------------------------------ state */
   const state = { y: 0, scale: 1, opacity: 0 };
   let time = Math.random() * 10;
   let turb = 0; // smoothed scroll-velocity turbulence
-  const tmp = new Vector3();
+  const tmp = new OGL.Vec3();
+  const tmpScaled = new OGL.Vec3();
 
   let narrow = false;
   const layout = () => {
@@ -154,7 +181,7 @@ export function createHeroScene() {
         b.cfg.fy * viewH * 0.34,
         b.cfg.fz
       );
-      if (b.pos.lengthSq() === 0) b.pos.copy(b.home);
+      if (b.pos.len() * b.pos.len() === 0) b.pos.copy(b.home);
     });
   };
 
@@ -164,8 +191,7 @@ export function createHeroScene() {
     state,
 
     resize(w, h) {
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
+      camera.perspective({ aspect: w / h });
       viewH = 2 * Math.tan((camera.fov * Math.PI) / 360) * camera.position.z;
       viewW = viewH * camera.aspect;
       narrow = w < 760;
@@ -193,23 +219,24 @@ export function createHeroScene() {
         const driftY = Math.cos(time * 0.17 + b.phase * 1.4) * 0.28;
 
         tmp.set(b.home.x + driftX - b.pos.x, b.home.y + driftY - b.pos.y, b.home.z - b.pos.z);
-        b.vel.addScaledVector(tmp, 2.3 * clampedDt);
+        b.vel.add(tmpScaled.copy(tmp).multiply(2.3 * clampedDt));
 
         if (pointerActive) {
           tmp.copy(b.pos).sub(pointerWorld);
           tmp.z = 0;
-          const d = tmp.length();
+          const d = tmp.len();
           // fast swipes reach further and push harder — the cluster
           // scatters when you slash through it, barely stirs when you drift
           const boost = 1 + pointerSpeed * 1.1;
           const R = (b.cfg.r + 1.5) * (1 + pointerSpeed * 0.35);
           if (d < R && d > 0.001) {
-            b.vel.addScaledVector(tmp.normalize(), (1 - d / R) * 13 * boost * clampedDt);
+            tmp.normalize();
+            b.vel.add(tmpScaled.copy(tmp).multiply((1 - d / R) * 13 * boost * clampedDt));
           }
         }
 
-        b.vel.multiplyScalar(Math.exp(-2.6 * clampedDt));
-        b.pos.addScaledVector(b.vel, clampedDt);
+        b.vel.multiply(Math.exp(-2.6 * clampedDt));
+        b.pos.add(tmpScaled.copy(b.vel).multiply(clampedDt));
       });
 
       // soft sphere-sphere separation
@@ -218,10 +245,10 @@ export function createHeroScene() {
           const a = blobs[i];
           const c = blobs[j];
           tmp.copy(a.pos).sub(c.pos);
-          const d = tmp.length();
+          const d = tmp.len();
           const minD = (a.cfg.r + c.cfg.r) * 0.92;
           if (d < minD && d > 0.001) {
-            tmp.normalize().multiplyScalar((minD - d) * 0.5);
+            tmp.normalize().multiply((minD - d) * 0.5);
             a.pos.add(tmp);
             c.pos.sub(tmp);
           }
@@ -229,7 +256,7 @@ export function createHeroScene() {
       }
 
       group.position.y = state.y;
-      group.scale.setScalar(state.scale);
+      group.scale.set(state.scale, state.scale, state.scale);
 
       // scroll velocity → surface turbulence (settles when you stop)
       const sv = lenis ? Math.min(Math.abs(lenis.velocity || 0) / 40, 1) : 0;
@@ -259,14 +286,17 @@ export function createHeroScene() {
         b.material.uniforms.uTurb.value = turb;
       });
 
-      glx.renderer.render(scene, camera);
+      glx.renderer.render({ scene, camera, target: glx.sceneTarget, clear: false });
     },
 
     dispose() {
       window.removeEventListener('pointermove', onPointer);
       window.removeEventListener('pointerdown', onDown);
-      geometry.dispose();
-      blobs.forEach((b) => b.material.dispose());
+      gl.deleteBuffer(geometry.attributes.position.buffer);
+      gl.deleteBuffer(geometry.attributes.normal.buffer);
+      gl.deleteBuffer(geometry.attributes.uv.buffer);
+      if (geometry.attributes.index) gl.deleteBuffer(geometry.attributes.index.buffer);
+      blobs.forEach((b) => gl.deleteProgram(b.material.program));
     },
   };
 

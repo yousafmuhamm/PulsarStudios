@@ -95,6 +95,14 @@ function makeRT(gl, w, h) {
     depth: false,
     stencil: false,
     type: gl.HALF_FLOAT,
+    // WebGL2 requires a *sized* internal format for float/half-float color
+    // attachments — OGL's RenderTarget/Texture default internalFormat to
+    // the unsized `format` (RGBA), which texImage2D rejects when paired
+    // with HALF_FLOAT, leaving every RT here FRAMEBUFFER_INCOMPLETE_ATTACHMENT
+    // (scenes render into it as a silent no-op, no console error). Three's
+    // WebGLRenderer picks the sized format internally; OGL does not, so it
+    // must be passed explicitly here (Task C finding).
+    internalFormat: gl.renderer.isWebgl2 ? gl.RGBA16F : gl.RGBA,
     magFilter: gl.LINEAR,
     minFilter: gl.LINEAR,
     wrapS: gl.CLAMP_TO_EDGE,
@@ -268,5 +276,5 @@ export function createPost(renderer) {
     deleteRT(blurB);
   }
 
-  return { resize, begin, end, dispose, setQuality, setExtraShift };
+  return { resize, begin, end, dispose, setQuality, setExtraShift, sceneRT: () => sceneRT };
 }

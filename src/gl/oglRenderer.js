@@ -44,6 +44,14 @@ class GL {
       this.renderer = new Renderer({
         canvas,
         alpha: true,
+        // Three's WebGLRenderer defaults premultipliedAlpha:true, and
+        // oglPost's composite shader writes premultiplied output (see its
+        // header comment) to match. OGL defaults this to false — leaving it
+        // off makes the browser treat the canvas's RGB as straight alpha, so
+        // the premultiplied composite reads as a solid black canvas over the
+        // whole page. Must match Three's default for the page to show
+        // through correctly (Task C finding: fixes a fully-opaque hero).
+        premultipliedAlpha: true,
         // MSAA only pays off when drawing straight to screen — under the
         // post pipeline every scene renders into a target, so skip it there
         antialias: !lowPower && !POST_ENABLED,
@@ -57,6 +65,15 @@ class GL {
       return;
     }
     this.renderer.gl.clearColor(0, 0, 0, 0);
+    // Three's WebGLRenderer enables the float-color-buffer extensions
+    // internally whenever a HalfFloatType render target is used; OGL does
+    // not, and WebGL2 refuses to attach a HALF_FLOAT texture as a color
+    // target until this is explicitly enabled (framebuffer status comes
+    // back FRAMEBUFFER_INCOMPLETE_ATTACHMENT, so oglPost's sceneRT/bloom
+    // targets silently fail to render into — the entire scene render was a
+    // no-op with no console error). Must request this before oglPost builds
+    // its half-float RenderTargets below (Task C finding).
+    this.renderer.gl.getExtension('EXT_color_buffer_float');
     this.setSize();
 
     if (POST_ENABLED) {
@@ -100,6 +117,11 @@ class GL {
 
   get ok() {
     return !!this.renderer;
+  }
+
+  /** current scene render target: the bloom input RT when post is on, else screen (null) */
+  get sceneTarget() {
+    return this.post ? this.post.sceneRT() : null;
   }
 
   setSize() {
