@@ -5,23 +5,11 @@
  *
  * A scene is: { render(timeSec, dtSec), resize(w, h), dispose() }
  */
-import {
-  WebGLRenderer, WebGLRenderTarget, Scene, Camera, PerspectiveCamera,
-  Group, Mesh, ShaderMaterial, BufferGeometry, BufferAttribute,
-  PlaneGeometry, SphereGeometry, Color, Vector2, Vector3, CanvasTexture,
-  HalfFloatType, LinearFilter, ClampToEdgeWrapping, NoBlending, SRGBColorSpace,
-} from 'three';
+import { WebGLRenderer } from './three.js';
 import { gsap } from '../core.js';
 import { lowPower, reducedMotion } from '../utils/env.js';
 import { createPost } from './post.js';
 import { tier } from './quality.js';
-
-const THREE = {
-  WebGLRenderer, WebGLRenderTarget, Scene, Camera, PerspectiveCamera,
-  Group, Mesh, ShaderMaterial, BufferGeometry, BufferAttribute,
-  PlaneGeometry, SphereGeometry, Color, Vector2, Vector3, CanvasTexture,
-  HalfFloatType, LinearFilter, ClampToEdgeWrapping, NoBlending, SRGBColorSpace,
-};
 
 // full-frame bloom + chromatic aberration; skipped on constrained devices
 const POST_ENABLED = !reducedMotion && !lowPower;
@@ -40,7 +28,7 @@ class GL {
   init(canvas) {
     if (this.renderer || this.failed || !canvas) return;
     try {
-      this.renderer = new THREE.WebGLRenderer({
+      this.renderer = new WebGLRenderer({
         canvas,
         alpha: true,
         // MSAA only pays off when drawing straight to screen — under the
@@ -173,4 +161,3 @@ class GL {
 }
 
 export const glx = new GL();
-export { THREE };

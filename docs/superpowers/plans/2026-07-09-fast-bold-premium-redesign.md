@@ -93,6 +93,12 @@ The felt-speed fix. Each task is independently shippable and independently rever
 
 **Context:** `src/gl/renderer.js:8` does `import * as THREE from 'three'` and re-exports it (`export { THREE }`). The namespace import defeats tree-shaking → the whole 503 KB library ships. Grep confirmed only these classes are used across `src/`: `WebGLRenderer, WebGLRenderTarget, Scene, Camera, PerspectiveCamera, Group, Mesh, ShaderMaterial, BufferGeometry, BufferAttribute, PlaneGeometry, SphereGeometry, Color, Vector2, Vector3, CanvasTexture, HalfFloatType, LinearFilter, ClampToEdgeWrapping, NoBlending, SRGBColorSpace`.
 
+**CORRECTION (discovered during implementation):** Re-exporting a bundled `const THREE = {...}` object does NOT tree-shake — Rollup cannot statically see which object properties downstream code uses, so it keeps the whole library (measured: still ~514 KB). Consumers (`post.js`, `heroScene.js`, `cardsScene.js`) import `{ THREE }` and call `THREE.Scene` etc. The working fix is **individual named re-exports** that Rollup can trace, and switching consumers to named classes:
+- Create `src/gl/three.js`: `export { WebGLRenderer, WebGLRenderTarget, Scene, ... } from 'three';` (individual re-exports of exactly the used set).
+- In `renderer.js`, `post.js`, `heroScene.js`, `cardsScene.js`: import named classes from `./three.js` (e.g. `import { Scene, Mesh, ShaderMaterial } from './three.js'`) and replace every `THREE.Xxx` with `Xxx`.
+- Remove the `const THREE = {...}` shim and `export { THREE }`.
+This touches 4 files but is the only approach that actually shrinks the chunk.
+
 - [ ] **Step 1: Replace the namespace import with named imports + a re-export shim**
 
 In `src/gl/renderer.js`, replace line 8:

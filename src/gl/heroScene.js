@@ -6,16 +6,20 @@
  * Exposes `state` { y, scale, opacity } so the page module can
  * choreograph the scroll handoff and the philosophy "ghost" pass.
  */
-import { glx, THREE } from './renderer.js';
+import { glx } from './renderer.js';
+import {
+  Color, Scene, PerspectiveCamera, Group, SphereGeometry, ShaderMaterial,
+  Mesh, Vector3, Vector2,
+} from './three.js';
 import { blobVertex, blobFragment } from './shaders.js';
 import { lenis } from '../core.js';
 import { lowPower, reducedMotion } from '../utils/env.js';
 
 const PULSE_PERIOD = 2.4;
 
-const COL_A = new THREE.Color('#6533FF');
-const COL_B = new THREE.Color('#31C6E8');
-const COL_EDGE = new THREE.Color('#B8FF2C');
+const COL_A = new Color('#6533FF');
+const COL_B = new Color('#31C6E8');
+const COL_EDGE = new Color('#B8FF2C');
 
 // home positions as fractions of half-viewport (x right of centre), radius in world units
 const BLOBS = [
@@ -29,17 +33,17 @@ const BLOBS = [
 export function createHeroScene() {
   if (!glx.ok) return null;
 
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 40);
+  const scene = new Scene();
+  const camera = new PerspectiveCamera(34, 1, 0.1, 40);
   camera.position.z = 8;
 
-  const group = new THREE.Group();
+  const group = new Group();
   scene.add(group);
 
   // 72 segments is visually identical after bloom at these sizes and cuts
   // the vertex-noise workload by ~60% vs the original 110
   const segs = lowPower ? 40 : 72;
-  const geometry = new THREE.SphereGeometry(1, segs, segs);
+  const geometry = new SphereGeometry(1, segs, segs);
 
   const count = lowPower ? 2 : BLOBS.length;
   const blobs = [];
@@ -48,7 +52,7 @@ export function createHeroScene() {
 
   for (let i = 0; i < count; i++) {
     const cfg = BLOBS[i];
-    const material = new THREE.ShaderMaterial({
+    const material = new ShaderMaterial({
       vertexShader: blobVertex,
       fragmentShader: blobFragment,
       transparent: true,
@@ -66,24 +70,24 @@ export function createHeroScene() {
         uHueShift: { value: i / count },
       },
     });
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = new Mesh(geometry, material);
     mesh.scale.setScalar(cfg.r);
     group.add(mesh);
     blobs.push({
       cfg,
       mesh,
       material,
-      pos: new THREE.Vector3(),
-      vel: new THREE.Vector3(),
-      home: new THREE.Vector3(),
+      pos: new Vector3(),
+      vel: new Vector3(),
+      home: new Vector3(),
       phase: i * 2.1,
     });
   }
 
   /* ---------------------------------------------------------- pointer */
-  const pointerNdc = new THREE.Vector2(10, 10); // offscreen
-  const pointerWorld = new THREE.Vector3(999, 999, 0);
-  const rayVec = new THREE.Vector3();
+  const pointerNdc = new Vector2(10, 10); // offscreen
+  const pointerWorld = new Vector3(999, 999, 0);
+  const rayVec = new Vector3();
   let pointerActive = false;
   let pointerSpeed = 0; // smoothed, ~0..2 — fast swipes push blobs harder
   let lastPX = 0;
@@ -138,7 +142,7 @@ export function createHeroScene() {
   const state = { y: 0, scale: 1, opacity: 0 };
   let time = Math.random() * 10;
   let turb = 0; // smoothed scroll-velocity turbulence
-  const tmp = new THREE.Vector3();
+  const tmp = new Vector3();
 
   let narrow = false;
   const layout = () => {

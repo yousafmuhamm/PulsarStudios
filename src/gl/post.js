@@ -14,7 +14,11 @@
  * Owned and driven by renderer.js. Gated off on low-power / reduced-motion
  * upstream, so this module assumes it should run when it exists.
  */
-import { THREE } from './renderer.js';
+import {
+  WebGLRenderTarget, HalfFloatType, LinearFilter, ClampToEdgeWrapping,
+  BufferGeometry, BufferAttribute, Camera, Scene, Mesh, ShaderMaterial,
+  Vector2, NoBlending,
+} from './three.js';
 import { lenis } from '../core.js';
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -74,14 +78,14 @@ void main() {
 }`;
 
 function makeRT(w, h, extra = {}) {
-  return new THREE.WebGLRenderTarget(Math.max(1, w), Math.max(1, h), {
+  return new WebGLRenderTarget(Math.max(1, w), Math.max(1, h), {
     depthBuffer: false,
     stencilBuffer: false,
-    type: THREE.HalfFloatType,
-    magFilter: THREE.LinearFilter,
-    minFilter: THREE.LinearFilter,
-    wrapS: THREE.ClampToEdgeWrapping,
-    wrapT: THREE.ClampToEdgeWrapping,
+    type: HalfFloatType,
+    magFilter: LinearFilter,
+    minFilter: LinearFilter,
+    wrapS: ClampToEdgeWrapping,
+    wrapT: ClampToEdgeWrapping,
     ...extra,
   });
 }
@@ -90,19 +94,19 @@ export function createPost(renderer) {
   const BLOOM_SCALE = 0.4; // bloom is inherently soft — quarter-ish res is plenty
 
   // fullscreen triangle
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
-  geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 2, 0, 0, 2]), 2));
-  const cam = new THREE.Camera();
-  const quadScene = new THREE.Scene();
-  const quad = new THREE.Mesh(geo);
+  const geo = new BufferGeometry();
+  geo.setAttribute('position', new BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
+  geo.setAttribute('uv', new BufferAttribute(new Float32Array([0, 0, 2, 0, 0, 2]), 2));
+  const cam = new Camera();
+  const quadScene = new Scene();
+  const quad = new Mesh(geo);
   quadScene.add(quad);
   const blit = (mat) => {
     quad.material = mat;
     renderer.render(quadScene, cam);
   };
 
-  const brightMat = new THREE.ShaderMaterial({
+  const brightMat = new ShaderMaterial({
     vertexShader: BASE_VERT,
     fragmentShader: BRIGHT_FRAG,
     depthTest: false,
@@ -113,25 +117,25 @@ export function createPost(renderer) {
       uKnee: { value: 0.28 },
     },
   });
-  const blurMat = new THREE.ShaderMaterial({
+  const blurMat = new ShaderMaterial({
     vertexShader: BASE_VERT,
     fragmentShader: BLUR_FRAG,
     depthTest: false,
     depthWrite: false,
-    uniforms: { tMap: { value: null }, uDir: { value: new THREE.Vector2() } },
+    uniforms: { tMap: { value: null }, uDir: { value: new Vector2() } },
   });
-  const compMat = new THREE.ShaderMaterial({
+  const compMat = new ShaderMaterial({
     vertexShader: BASE_VERT,
     fragmentShader: COMPOSITE_FRAG,
     depthTest: false,
     depthWrite: false,
     transparent: true,
-    blending: THREE.NoBlending,
+    blending: NoBlending,
     uniforms: {
       tScene: { value: null },
       tBloom: { value: null },
       uBloom: { value: 0.72 },
-      uAberr: { value: new THREE.Vector2() },
+      uAberr: { value: new Vector2() },
     },
   });
 

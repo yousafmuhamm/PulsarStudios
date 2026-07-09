@@ -11,7 +11,11 @@
  *      resolves as smooth motion instead of a visible jump
  * Perspective camera (not ortho) so the tilt reads as genuine 3D depth.
  */
-import { glx, THREE } from './renderer.js';
+import { glx } from './renderer.js';
+import {
+  Scene, PerspectiveCamera, PlaneGeometry, ShaderMaterial, Mesh, Vector2,
+  CanvasTexture, SRGBColorSpace, LinearFilter, ClampToEdgeWrapping,
+} from './three.js';
 import { cardVertex, cardFragment } from './shaders.js';
 import { gsap } from '../core.js';
 import { isTouch, reducedMotion } from '../utils/env.js';
@@ -19,7 +23,7 @@ import { isTouch, reducedMotion } from '../utils/env.js';
 export function createCardsScene(els) {
   if (!glx.ok || !els.length || reducedMotion) return null;
 
-  const scene = new THREE.Scene();
+  const scene = new Scene();
   let vw = window.innerWidth;
   let vh = window.innerHeight;
 
@@ -27,9 +31,9 @@ export function createCardsScene(els) {
   // which lets tilted planes catch real foreshortening
   const camDist = 1000;
   const fov = 2 * Math.atan(vh / 2 / camDist) * (180 / Math.PI);
-  const camera = new THREE.PerspectiveCamera(fov, vw / vh, 10, 4000);
+  const camera = new PerspectiveCamera(fov, vw / vh, 10, 4000);
   camera.position.z = camDist;
-  const geometry = new THREE.PlaneGeometry(1, 1);
+  const geometry = new PlaneGeometry(1, 1);
 
   // shared cursor position (px) + velocity → uv-space rgb shift + tilt anchor
   const vel = { x: 0, y: 0 };
@@ -69,7 +73,7 @@ export function createCardsScene(els) {
     const img = el.querySelector('img');
     if (!img) return;
 
-    const material = new THREE.ShaderMaterial({
+    const material = new ShaderMaterial({
       vertexShader: cardVertex,
       fragmentShader: cardFragment,
       transparent: true,
@@ -79,13 +83,13 @@ export function createCardsScene(els) {
         uMap: { value: null },
         uHover: { value: 0 },
         uTime: { value: Math.random() * 20 },
-        uShift: { value: new THREE.Vector2() },
-        uSize: { value: new THREE.Vector2(1, 1) },
+        uShift: { value: new Vector2() },
+        uSize: { value: new Vector2(1, 1) },
         uRadius: { value: 6 },
         uParallax: { value: 0 },
       },
     });
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = new Mesh(geometry, material);
     mesh.visible = false;
     scene.add(mesh);
 
@@ -117,10 +121,10 @@ export function createCardsScene(els) {
       cnv.height = 768;
       const c2d = cnv.getContext('2d');
       c2d.drawImage(image, 0, 0, cnv.width, cnv.height);
-      const tex = new THREE.CanvasTexture(cnv);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.minFilter = THREE.LinearFilter;
-      tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+      const tex = new CanvasTexture(cnv);
+      tex.colorSpace = SRGBColorSpace;
+      tex.minFilter = LinearFilter;
+      tex.wrapS = tex.wrapT = ClampToEdgeWrapping;
       material.uniforms.uMap.value = tex;
       plane.tex = tex;
       plane.ready = true;
