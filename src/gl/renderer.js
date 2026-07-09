@@ -5,11 +5,23 @@
  *
  * A scene is: { render(timeSec, dtSec), resize(w, h), dispose() }
  */
-import * as THREE from 'three';
+import {
+  WebGLRenderer, WebGLRenderTarget, Scene, Camera, PerspectiveCamera,
+  Group, Mesh, ShaderMaterial, BufferGeometry, BufferAttribute,
+  PlaneGeometry, SphereGeometry, Color, Vector2, Vector3, CanvasTexture,
+  HalfFloatType, LinearFilter, ClampToEdgeWrapping, NoBlending, SRGBColorSpace,
+} from 'three';
 import { gsap } from '../core.js';
 import { lowPower, reducedMotion } from '../utils/env.js';
 import { createPost } from './post.js';
 import { tier } from './quality.js';
+
+const THREE = {
+  WebGLRenderer, WebGLRenderTarget, Scene, Camera, PerspectiveCamera,
+  Group, Mesh, ShaderMaterial, BufferGeometry, BufferAttribute,
+  PlaneGeometry, SphereGeometry, Color, Vector2, Vector3, CanvasTexture,
+  HalfFloatType, LinearFilter, ClampToEdgeWrapping, NoBlending, SRGBColorSpace,
+};
 
 // full-frame bloom + chromatic aberration; skipped on constrained devices
 const POST_ENABLED = !reducedMotion && !lowPower;
