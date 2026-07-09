@@ -8,6 +8,7 @@
  */
 import { glx, THREE } from './renderer.js';
 import { blobVertex, blobFragment } from './shaders.js';
+import { lenis } from '../core.js';
 import { lowPower, reducedMotion } from '../utils/env.js';
 
 const PULSE_PERIOD = 2.4;
@@ -57,6 +58,7 @@ export function createHeroScene() {
         uPulse: { value: 0 },
         uAmp: { value: 0.16 },
         uSeed: { value: i * 7.31 + 1.7 },
+        uTurb: { value: 0 },
         uColorA: { value: COL_A },
         uColorB: { value: COL_B },
         uColorEdge: { value: COL_EDGE },
@@ -135,6 +137,7 @@ export function createHeroScene() {
   /* ------------------------------------------------------------ state */
   const state = { y: 0, scale: 1, opacity: 0 };
   let time = Math.random() * 10;
+  let turb = 0; // smoothed scroll-velocity turbulence
   const tmp = new THREE.Vector3();
 
   let narrow = false;
@@ -224,6 +227,12 @@ export function createHeroScene() {
       group.position.y = state.y;
       group.scale.setScalar(state.scale);
 
+      // scroll velocity → surface turbulence (settles when you stop)
+      const sv = lenis ? Math.min(Math.abs(lenis.velocity || 0) / 40, 1) : 0;
+      turb += (sv - turb) * Math.min(1, dt * 6);
+      // fast scroll also pumps the composite RGB-split for a kinetic streak
+      glx.pumpAberration(turb * 0.0022);
+
       // parallax tilt — the whole cluster leans gently toward the cursor
       if (pointerActive) {
         const k = 1 - Math.exp(-3 * dt);
@@ -232,10 +241,18 @@ export function createHeroScene() {
       }
 
       blobs.forEach((b) => {
-        b.mesh.position.copy(b.pos);
+        // depth parallax: blobs further back (more negative fz) shift LESS
+        // with the pointer than near ones → real 3D separation, not a flat tilt
+        const depth = 1 + b.cfg.fz * 0.5; // ~0.6..1.15
+        b.mesh.position.set(
+          b.pos.x + pointerNdc.x * 0.35 * depth,
+          b.pos.y + pointerNdc.y * 0.25 * depth,
+          b.pos.z
+        );
         b.material.uniforms.uTime.value = time;
         b.material.uniforms.uPulse.value = pulse;
         b.material.uniforms.uOpacity.value = state.opacity;
+        b.material.uniforms.uTurb.value = turb;
       });
 
       glx.renderer.render(scene, camera);

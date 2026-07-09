@@ -1,9 +1,15 @@
 /**
  * Cards scene — project images become GL planes with a hover shader:
- * RGB-shift + wave distortion driven by cursor velocity, lerping to rest.
- * Plane positions are synced to their DOM rects every frame (only while
- * on screen, gated by an IntersectionObserver), which stays correct
- * through Lenis scroll, pins and the horizontal work section.
+ * RGB-shift + wave distortion + a real 3D tilt toward the cursor.
+ *
+ * Smoothness (the Lusion scroll-sync lesson): a fixed canvas reading each
+ * card's getBoundingClientRect() mid-tick catches positions the compositor
+ * has already moved, so planes drift and snap during scroll. Fixes here:
+ *   1. batch ALL rect reads at the top of the tick (one layout flush, not N
+ *      interleaved read/writes that thrash layout)
+ *   2. lerp each plane toward its measured slot so any single-frame desync
+ *      resolves as smooth motion instead of a visible jump
+ * Perspective camera (not ortho) so the tilt reads as genuine 3D depth.
  */
 import { glx, THREE } from './renderer.js';
 import { cardVertex, cardFragment } from './shaders.js';
@@ -14,18 +20,27 @@ export function createCardsScene(els) {
   if (!glx.ok || !els.length || reducedMotion) return null;
 
   const scene = new THREE.Scene();
-  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -10, 10);
-  const geometry = new THREE.PlaneGeometry(1, 1);
   let vw = window.innerWidth;
   let vh = window.innerHeight;
 
-  // shared cursor velocity → uv-space rgb shift
+  // perspective camera positioned so 1px == 1 world unit at z=0 (screen plane),
+  // which lets tilted planes catch real foreshortening
+  const camDist = 1000;
+  const fov = 2 * Math.atan(vh / 2 / camDist) * (180 / Math.PI);
+  const camera = new THREE.PerspectiveCamera(fov, vw / vh, 10, 4000);
+  camera.position.z = camDist;
+  const geometry = new THREE.PlaneGeometry(1, 1);
+
+  // shared cursor position (px) + velocity → uv-space rgb shift + tilt anchor
   const vel = { x: 0, y: 0 };
   const shift = { x: 0, y: 0 };
+  const ptr = { x: -9999, y: -9999 };
   let lastX = 0;
   let lastY = 0;
   let lastT = 0;
   const onPointer = (e) => {
+    ptr.x = e.clientX;
+    ptr.y = e.clientY;
     const now = performance.now();
     const dt = Math.max(now - lastT, 8) / 1000;
     vel.x = gsap.utils.clamp(-1.6, 1.6, ((e.clientX - lastX) / dt) * 0.0004);
@@ -74,7 +89,23 @@ export function createCardsScene(els) {
     mesh.visible = false;
     scene.add(mesh);
 
-    const plane = { el, img, mesh, material, ready: false, hover: 0 };
+    const plane = {
+      el,
+      img,
+      mesh,
+      material,
+      ready: false,
+      hover: 0,
+      // lerped display position/size + tilt state
+      px: 0,
+      py: 0,
+      pw: 0,
+      ph: 0,
+      init: false,
+      tiltX: 0,
+      tiltY: 0,
+      pop: 0,
+    };
 
     // rasterise the (same-origin SVG) image into a texture
     const src = img.currentSrc || img.src;
@@ -117,10 +148,8 @@ export function createCardsScene(els) {
     resize(w, h) {
       vw = w;
       vh = h;
-      camera.left = -w / 2;
-      camera.right = w / 2;
-      camera.top = h / 2;
-      camera.bottom = -h / 2;
+      camera.fov = 2 * Math.atan(vh / 2 / camDist) * (180 / Math.PI);
+      camera.aspect = w / h;
       camera.updateProjectionMatrix();
     },
 
@@ -131,25 +160,62 @@ export function createCardsScene(els) {
       shift.x += (vel.x - shift.x) * Math.min(1, dt * 10);
       shift.y += (vel.y - shift.y) * Math.min(1, dt * 10);
 
-      let any = false;
+      // ---- PASS 1: batch every rect read (single layout flush, no thrash) ----
+      const live = [];
       active.forEach((p) => {
         if (!p.ready) return;
-        any = true;
         const r = p.el.getBoundingClientRect();
-        p.mesh.scale.set(r.width, r.height, 1);
-        p.mesh.position.set(r.left + r.width / 2 - vw / 2, -(r.top + r.height / 2) + vh / 2, 0);
-        p.material.uniforms.uTime.value += dt;
-        p.material.uniforms.uSize.value.set(r.width, r.height);
-        p.material.uniforms.uShift.value.set(shift.x * 0.045, shift.y * 0.03);
-        // inner-image parallax: the photo pans as its card travels across
-        // the viewport (horizontal work section + vertical scroll alike)
-        p.material.uniforms.uParallax.value = gsap.utils.clamp(
-          -1,
-          1,
-          (r.left + r.width / 2 - vw / 2) / (vw * 0.5)
-        );
+        p.tx = r.left + r.width / 2 - vw / 2;
+        p.ty = -(r.top + r.height / 2) + vh / 2;
+        p.tw = r.width;
+        p.th = r.height;
+        live.push(p);
       });
-      if (any) glx.renderer.render(scene, camera);
+      if (!live.length) return;
+
+      // ---- PASS 2: lerp toward measured slots + 3D tilt, then all writes ----
+      const posK = Math.min(1, dt * 22); // fast enough to feel locked, soft enough to hide desync
+      const tiltK = Math.min(1, dt * 9);
+      live.forEach((p) => {
+        if (!p.init) {
+          p.px = p.tx;
+          p.py = p.ty;
+          p.pw = p.tw;
+          p.ph = p.th;
+          p.init = true;
+        }
+        p.px += (p.tx - p.px) * posK;
+        p.py += (p.ty - p.py) * posK;
+        p.pw += (p.tw - p.pw) * posK;
+        p.ph += (p.th - p.ph) * posK;
+
+        // 3D tilt: how far is the cursor across THIS card, -1..1 each axis
+        const cx = p.tx; // card centre in screen space (y-up)
+        const cy = p.ty;
+        const mx = ptr.x - vw / 2;
+        const my = -(ptr.y - vh / 2);
+        const within =
+          p.hover > 0.01 &&
+          Math.abs(mx - cx) < p.tw * 0.75 &&
+          Math.abs(my - cy) < p.th * 0.75;
+        const nx = within ? gsap.utils.clamp(-1, 1, (mx - cx) / (p.tw / 2)) : 0;
+        const ny = within ? gsap.utils.clamp(-1, 1, (my - cy) / (p.th / 2)) : 0;
+        // tilt AWAY on the far edge, toward on the near edge → pop-out feel
+        const targetTiltX = -ny * 0.18; // rotate about X from vertical cursor pos
+        const targetTiltY = nx * 0.18; // rotate about Y from horizontal cursor pos
+        p.tiltX += (targetTiltX - p.tiltX) * tiltK;
+        p.tiltY += (targetTiltY - p.tiltY) * tiltK;
+        p.pop += ((within ? 60 : 0) - p.pop) * tiltK; // lift toward camera on hover
+
+        p.mesh.position.set(p.px, p.py, p.pop);
+        p.mesh.scale.set(p.pw, p.ph, 1);
+        p.mesh.rotation.set(p.tiltX, p.tiltY, 0);
+        p.material.uniforms.uTime.value += dt;
+        p.material.uniforms.uSize.value.set(p.pw, p.ph);
+        p.material.uniforms.uShift.value.set(shift.x * 0.045, shift.y * 0.03);
+        p.material.uniforms.uParallax.value = gsap.utils.clamp(-1, 1, p.px / (vw * 0.5));
+      });
+      glx.renderer.render(scene, camera);
     },
 
     dispose() {

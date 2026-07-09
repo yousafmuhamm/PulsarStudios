@@ -53,18 +53,24 @@ uniform float uTime;
 uniform float uPulse;
 uniform float uAmp;
 uniform float uSeed;
+uniform float uTurb;   // scroll-velocity turbulence, 0..1
 varying vec3 vNormal;
 varying vec3 vView;
+varying vec3 vWorldNormal;
 varying float vNoise;
 ${simplex3}
 void main() {
+  // second, faster noise octave gains amplitude with scroll turbulence, so
+  // the surface roils when you fling the page and settles when you rest
   float n = snoise(normal * 1.35 + vec3(uSeed) + uTime * 0.22);
-  float n2 = snoise(normal * 3.4 - vec3(uSeed * 0.7) + uTime * 0.14);
-  float disp = (n * 0.75 + n2 * 0.25) * uAmp * (0.55 + 0.45 * uPulse) + uPulse * 0.05;
+  float n2 = snoise(normal * 3.4 - vec3(uSeed * 0.7) + uTime * (0.14 + uTurb * 0.6));
+  float amp = uAmp * (1.0 + uTurb * 1.4);
+  float disp = (n * 0.75 + n2 * 0.25) * amp * (0.55 + 0.45 * uPulse) + uPulse * 0.05;
   vec3 pos = position + normal * disp;
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   vNormal = normalize(normalMatrix * normal);
   vView = normalize(-mv.xyz);
+  vWorldNormal = normalize(mat3(modelMatrix) * normal);
   vNoise = n;
   gl_Position = projectionMatrix * mv;
 }`;
@@ -79,14 +85,34 @@ uniform float uTime;
 uniform float uHueShift;
 varying vec3 vNormal;
 varying vec3 vView;
+varying vec3 vWorldNormal;
 varying float vNoise;
+
+// cheap procedural "studio" environment: two soft key lights + gradient sky,
+// sampled by the reflection vector — gives the blob a wet, glossy 3D read
+// without an actual cubemap texture (zero bandwidth, one function).
+vec3 envSample(vec3 dir) {
+  vec3 sky = mix(vec3(0.04, 0.05, 0.09), vec3(0.55, 0.60, 0.78), dir.y * 0.5 + 0.5);
+  float key = pow(max(dot(dir, normalize(vec3(0.5, 0.8, 0.35))), 0.0), 24.0);
+  float rim = pow(max(dot(dir, normalize(vec3(-0.6, 0.3, -0.5))), 0.0), 8.0);
+  return sky + key * vec3(1.4, 1.3, 1.1) + rim * vec3(0.4, 0.9, 0.3);
+}
+
 void main() {
   vec3 N = normalize(vNormal);
   vec3 V = normalize(vView);
   float fres = pow(1.0 - max(dot(N, V), 0.0), 2.4);
+
+  // iridescent base
   float sweep = smoothstep(-0.7, 0.8, vNoise + sin(uTime * 0.3 + uHueShift * 6.283) * 0.35 + N.y * 0.4);
   vec3 col = mix(uColorA, uColorB, sweep);
   col = mix(col, uColorEdge, fres * 0.9);
+
+  // environment reflection — strongest at grazing angles, like real gloss
+  vec3 refl = reflect(-V, N);
+  vec3 env = envSample(normalize(vWorldNormal + refl * 0.6));
+  col += env * (0.10 + fres * 0.35);
+
   col += fres * 0.12;
   float alpha = uOpacity * (0.30 + fres * 0.62);
   gl_FragColor = vec4(col, alpha);

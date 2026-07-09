@@ -139,6 +139,8 @@ export function createPost(renderer) {
   let bw = 1;
   let bh = 1;
   let aberr = 0; // smoothed scroll-driven RGB split
+  let quality = 1; // 0..1 from the adaptive tier
+  let extraShift = 0; // scroll-velocity RGB split boost, set per frame by the page
 
   function resize(w, h) {
     const dpr = renderer.getPixelRatio();
@@ -174,13 +176,20 @@ export function createPost(renderer) {
     renderer.clear();
     blit(brightMat);
 
-    // two separable gaussian iterations
-    const passes = [
-      [brightRT, blurA, [1 / bw, 0]],
-      [blurA, blurB, [0, 1 / bh]],
-      [blurB, blurA, [1.6 / bw, 0]],
-      [blurA, blurB, [0, 1.6 / bh]],
-    ];
+    // separable gaussian — 4 passes at full quality, 2 when the tier drops
+    // (halving blur passes is the cheapest big fill-rate win under stress)
+    const passes =
+      quality > 0.6
+        ? [
+            [brightRT, blurA, [1 / bw, 0]],
+            [blurA, blurB, [0, 1 / bh]],
+            [blurB, blurA, [1.6 / bw, 0]],
+            [blurA, blurB, [0, 1.6 / bh]],
+          ]
+        : [
+            [brightRT, blurA, [1.3 / bw, 0]],
+            [blurA, blurB, [0, 1.3 / bh]],
+          ];
     for (const [src, dst, dir] of passes) {
       blurMat.uniforms.tMap.value = src.texture;
       blurMat.uniforms.uDir.value.set(dir[0], dir[1]);
@@ -189,16 +198,25 @@ export function createPost(renderer) {
       blit(blurMat);
     }
 
-    // scroll-velocity → RGB split, smoothed, with a faint idle baseline
+    // scroll-velocity → RGB split, smoothed, with a faint idle baseline.
+    // extraShift lets the page pump it further on fast flicks (interactivity).
     const v = lenis ? Math.abs(lenis.velocity || 0) : 0;
-    const target = clamp(0.0006 + v * 0.00006, 0, 0.004);
+    const target = clamp((0.0006 + v * 0.00006 + extraShift) * quality, 0, 0.006);
     aberr += (target - aberr) * 0.15;
     compMat.uniforms.uAberr.value.set(aberr, 0);
+    compMat.uniforms.uBloom.value = 0.5 + 0.22 * quality;
 
     compMat.uniforms.tScene.value = sceneRT.texture;
     compMat.uniforms.tBloom.value = blurB.texture;
     renderer.setRenderTarget(null);
     blit(compMat);
+  }
+
+  function setQuality(q) {
+    quality = q;
+  }
+  function setExtraShift(s) {
+    extraShift = s;
   }
 
   function dispose() {
@@ -212,5 +230,5 @@ export function createPost(renderer) {
     blurB?.dispose();
   }
 
-  return { resize, begin, end, dispose };
+  return { resize, begin, end, dispose, setQuality, setExtraShift };
 }

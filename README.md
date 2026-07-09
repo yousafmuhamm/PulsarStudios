@@ -59,3 +59,24 @@ Every HTML file is **generated** from template functions — don't edit
   scene renders one static frame.
 - Touch devices: no custom cursor/magnetics, Featured Work becomes a native
   swipe carousel.
+
+## Performance & interactivity systems
+
+- **Adaptive quality** (`src/gl/quality.js`): a frame-time watchdog on the
+  gsap ticker moves a 0..1 `tier.value` down when the machine can't hold
+  ~60fps and back up when it has headroom (fast drop, slow recover, with
+  hysteresis so it never oscillates). The renderer reads it for live DPR;
+  post reads it to halve bloom passes and thin effects under stress. One
+  build, lush on an M-series Mac and smooth on weak hardware.
+- **Scroll-sync (anti-jank)** (`src/gl/cardsScene.js`): the Lusion lesson —
+  a fixed canvas reading `getBoundingClientRect()` mid-tick catches
+  compositor-moved positions and the planes drift/snap. Fix: batch all rect
+  reads at the top of the tick (one layout flush) and lerp each plane toward
+  its slot so desync resolves as smooth motion. Measured worst-frame during
+  scroll dropped from ~56ms to ~22ms.
+- **Tab pause**: the render loop stops entirely when `document.hidden`.
+- **3D**: project cards use a perspective camera and tilt/pop toward the
+  cursor (`rotate3d`-style, lerped). The hero orb has a procedural
+  environment reflection (glossy 3D read, no cubemap) and depth-based Z
+  parallax so blobs separate by distance under the pointer. Scroll velocity
+  feeds blob surface turbulence + composite RGB-split (`glx.pumpAberration`).
