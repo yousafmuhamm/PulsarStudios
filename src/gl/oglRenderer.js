@@ -16,16 +16,7 @@ import {
 import { gsap } from '../core.js';
 import { lowPower, reducedMotion } from '../utils/env.js';
 import { tier } from './quality.js';
-
-// TODO(Task B): oglPost.js doesn't exist yet — it will port post.js's bloom
-// + chromatic aberration pipeline to OGL. A plain `import('./oglPost.js')`
-// would make the bundler fail the build on a missing specifier even behind
-// a try/catch (module resolution happens at bundle time, not at runtime).
-// `import.meta.glob` sidesteps that: it's a build-time glob over existing
-// files, so with zero matches it just yields an empty map instead of an
-// error. `init()` below reads from this map, so once oglPost.js exists it
-// is picked up automatically with no code changes here.
-const oglPostModules = import.meta.glob('./oglPost.js');
+import { createPost } from './oglPost.js';
 
 // full-frame bloom + chromatic aberration; skipped on constrained devices
 const POST_ENABLED = !reducedMotion && !lowPower;
@@ -68,21 +59,15 @@ class GL {
     this.renderer.gl.clearColor(0, 0, 0, 0);
     this.setSize();
 
-    const loadOglPost = oglPostModules['./oglPost.js'];
-    if (POST_ENABLED && loadOglPost) {
-      // oglPost.js exists (Task B landed) — load and wire it up.
-      loadOglPost()
-        .then(({ createPost }) => {
-          if (!this.renderer) return; // disposed/failed before this resolved
-          this.post = createPost(this.renderer);
-          this.post.resize(window.innerWidth, window.innerHeight);
-        })
-        .catch(() => {
-          this.post = null;
-        });
+    if (POST_ENABLED) {
+      // Synchronous wiring (matches the Three.js renderer.js): building the
+      // post pipeline inline in init() means bloom is live on the very
+      // first frame. An async import here would race the first tick and
+      // show a flash of unbloomed output before the pipeline finishes
+      // loading.
+      this.post = createPost(this.renderer);
+      this.post.resize(window.innerWidth, window.innerHeight);
     }
-    // else: oglPost.js doesn't exist yet (pre-Task B) — this.post stays
-    // null and tick()/renderOnce() fall back to direct-to-screen rendering.
 
     this.onResize = this.onResize.bind(this);
     window.addEventListener('resize', this.onResize);
