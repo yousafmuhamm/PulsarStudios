@@ -1,6 +1,6 @@
-# Pulsar Studios — Lusion-Tier Maximalist Redesign
+# Pulsar Studios — Fast, Bold & Premium Redesign
 
-**Date:** 2026-07-09
+**Date:** 2026-07-09 (revised)
 **Status:** Draft for review
 **Author:** Brainstormed with Claude (superpowers/brainstorming)
 
@@ -8,230 +8,190 @@
 
 ## 1. Goal & Context
 
-Pulsar Studios is a web-development company. Its own website is its single most
-important sales asset — it must demonstrate the craft the company sells. The
-current site is already high-quality (Three.js blob hero with fresnel shaders and
-a ~2.4s "pulsar" pulse, GSAP + Lenis smooth scroll, custom cursor, preloader/veil
-transitions, film grain, a clean data-driven project system). The goal is to push
-it to **"extravagant, over-the-top, premium"** — benchmark: [lusion.co](https://lusion.co),
-an Awwwards/FWA Site-of-the-Month-winning creative-dev studio.
+Pulsar Studios is a web-development company; its own site is its top sales asset and
+must demonstrate the craft it sells. The current site is already technically
+sophisticated (Three.js blob hero with fresnel shaders + ~2.4s "pulsar" pulse, adaptive
+quality tier, GSAP + Lenis smooth scroll, custom cursor, preloader/veil transitions,
+film grain, bloom + RGB-split post-processing, a clean data-driven project system).
 
-Two intertwined objectives:
-1. **Elevate the site** to Lusion-tier maximalism.
-2. **Add real projects** — the user has **real, live client websites** (live URLs)
-   to showcase. Current 8 projects in `src/data/projects.js` are fictional
-   placeholders to be replaced with real work.
+**The problem the user actually reported:** the site *feels slow* and *looks a bit bland*
+— despite there being very little content. Investigation showed these are linked: the
+site looks cheap **because** it loads slow. Fixing speed makes the existing craft read as
+premium.
 
-### Key research findings (Lusion)
-- Premium ≠ many effects. It's **one committed idea, executed with real physics.**
-  ("Commit to one hard idea and budget everything around it.")
-- **Single hero object with real weight/inertia** — physics-mimicking easing.
-- **Scroll moves a camera through true Z-depth** — fly *through* the scene, not
-  scroll *past* flat 2D layers. Biggest single "premium" differentiator.
-- **Scene-per-project** — each project is a self-contained 3D "room" entered/exited
-  on scroll (museum-room pacing).
-- **Signature volumetric effect** — Lusion's is "curly noise tubes with light
-  scattering."
-- **Baked + real-time blend** — "You don't need to do everything real-time." Heavy
-  sims pre-rendered (Houdini/Redshift), blended with a live interaction layer.
-- Dark theme, high contrast, generous negative space, cinematic pacing.
+Benchmark reference: [lusion.co](https://lusion.co) (Awwwards/FWA-winning creative-dev
+studio) — but the user explicitly chose **fast + bold + real-work** over **heavy signature
+3D**. So this spec is NOT the maximalist persistent-world/curly-tube build; it is a
+performance-first premium polish.
 
-Sources: lusion.co; Codrops "Curly Tubes from the Lusion Website with Three.js";
-Awwwards Lusion case study; utsubo.com "Best Three.js Websites 2026".
+### Measured diagnosis (evidence)
+- **Built bundle 1.3 MB**, of which:
+  - `three` chunk **503 KB** (77% of JS) — caused by a single `import * as THREE from 'three'`
+    in `src/gl/renderer.js`, which defeats tree-shaking. Only ~20 Three classes are actually
+    used (all named-importable). **Named imports should cut this to ~120–150 KB.**
+  - `gsap` chunk 130 KB, `main` app JS 47 KB, CSS 29 KB.
+- Everything loads **upfront on every page** — WebGL bundle not lazy-loaded.
+- Render pipeline is heavy for the payload: offscreen RT + bright-pass + 4 blur passes +
+  composite every frame (MSAA, half-float) to bloom a few blobs. Beautifully engineered
+  (`quality.js` adaptive tier is genuinely strong) but high fill-rate for what's on screen.
 
 ### Decisions locked during brainstorming
-- **Ambition:** Full Lusion-tier maximalism (accepting build-time / perf / mobile risk).
-- **Architecture:** Approach A — one persistent Three.js "world," camera-on-a-spline,
-  stations in Z-depth, DOM as overlay, real URLs preserved. Baked video fallback on mobile.
-- **Signature hero:** Curly volumetric tubes (Lusion-style) — made Pulsar's own via
-  palette + the traveling pulsar-beat pulse.
-- **Projects:** Real live client sites, presented as 3D rooms with live-site embeds.
+- **Performance:** Full optimization pass, done **FIRST**, before any new visual features.
+- **Wow direction (user-chosen, in priority order):**
+  1. **Bolder art direction** (design-only, zero JS weight)
+  2. **Rich micro-interactions** (cheap weight, high felt-quality)
+  3. **Interactive project rooms** with live-site embeds for real client work
+- **Explicitly deferred/dropped:** persistent-world camera architecture and the curly-tube
+  volumetric hero. Not chosen. May revisit later once the fast foundation exists.
+- **Real projects:** user has real, live client websites (live URLs) to showcase; current
+  8 projects in `src/data/projects.js` are fictional placeholders to replace.
 
 ---
 
-## 2. Architecture — The Persistent World (Approach A)
+## 2. Phase 1 — Performance Optimization (do this first)
 
-Invert the current discrete-page model into **one Three.js world that boots once and
-never tears down.** Scroll + navigation move a **camera along a spline** through Z-depth.
-Sections are *places*, not pages.
+Goal: make the site *feel* fast. Target: < 150 KB critical JS, < 2s time-to-interactive on
+mid mobile, 60fps desktop / smooth mobile. No visual regression.
 
-### Components
-- **`src/gl/world.js`** (new) — owns one `Scene`, one camera rig, and a camera path
-  (`CatmullRomCurve3` through Z). Lenis scroll position maps to distance along the spline.
-- **Stations** (`src/gl/stations/*.js`, new) — self-contained modules registered into
-  the shared scene at fixed Z. Each exposes `onEnter / onExit / update(cameraDist)`.
-  Distance + frustum culling means only 1–2 stations render at once. Station order:
-  `hero` → `intro` → `philosophy` → **gallery corridor** (project stations) → `contact`.
-- **DOM overlay** — HTML text/UI positioned over the canvas, synced to camera stations.
-  Existing `data-reveal` / `data-scrub-words` system still drives copy reveals.
-- **Routing** (`router.js` rewrite) — navigation becomes "animate camera to a station,"
-  not "load a page." Deep links (`/projects/<slug>`) fast-travel the camera to that
-  station's Z on load. Real URLs preserved via History API for SEO/shareability;
-  no in-session reloads.
+### 2.1 Tree-shake Three.js (biggest single win, ~350 KB)
+- Replace `import * as THREE from 'three'` in `src/gl/renderer.js` with named imports of only
+  the used classes, re-exported as a `THREE`-shaped object so downstream `THREE.Xxx` usage is
+  untouched. Used set (confirmed by grep): `WebGLRenderer, WebGLRenderTarget, Scene, Camera,
+  PerspectiveCamera, Group, Mesh, ShaderMaterial, BufferGeometry, BufferAttribute,
+  PlaneGeometry, SphereGeometry, Color, Vector2, Vector3, CanvasTexture, HalfFloatType,
+  LinearFilter, ClampToEdgeWrapping, NoBlending, SRGBColorSpace`.
+- Verify the `three` chunk drops to ~120–150 KB after build. No behavior change.
 
-### Carried forward (absorbed, not discarded)
-`renderer.js`, `post.js`, `quality.js`, `transitions.js`, `shaders.js`. The blob
-`heroScene.js` seeds the pulsar accent; `cardsScene.js` logic informs project stations.
+### 2.2 Lazy-load the WebGL layer
+- Dynamic-import the GL bundle (`renderer.js` + scenes + post) so it loads *after* first
+  paint, not before. The page is readable/interactive immediately; the canvas fades in when
+  ready. Keeps first-load JS tiny.
+- Static/CSS hero placeholder shows instantly; WebGL upgrades it progressively.
 
-### Touch list
-New `world.js` + `stations/`; rewrite `router.js`, `main.js` boot, `core.js` scroll
-wiring. HTML files become lighter (content sources / overlay markup).
+### 2.3 Defer / trim GSAP + Lenis
+- Audit GSAP usage; import only used plugins. Ensure Lenis + GSAP aren't blocking first paint.
+- Consider deferring smooth-scroll init until after first interaction on slow devices.
 
-### Named tradeoff
-One shared GPU budget. Every station must be disciplined on draw calls / shader cost.
-Hard perf ceiling enforced by distance-culling (see §7).
+### 2.4 Lighten the render pipeline (proportional to payload)
+- Make the full bloom pipeline **conditional on there being bright content on screen** and on
+  the quality tier — drop from 4 blur passes to 2 by default, keep 4 only on high tier.
+- Reduce offscreen RT cost where the payload is small; keep the adaptive `quality.js` tier
+  (it's good) but bias its defaults lower so mid devices start smooth.
 
----
+### 2.5 Asset & loading hygiene
+- Compress/lazy-load project images (already SVG thumbs — keep light; real screenshots must be
+  responsive + compressed, KTX2/AVIF where raster).
+- Preload only the critical font subset; `font-display: swap`.
+- Add resource hints; ensure code-split per route so a page loads only what it needs.
 
-## 3. Signature Curly-Tube Hero
-
-The flagship / screenshot moment.
-
-### Core effect (proven recipe)
-- **Geometry:** multiple `TubeGeometry` instances whose paths are `CatmullRomCurve3`
-  curves. Control points driven by **3D curl noise** (divergence-free simplex) — gives
-  organic flowing motion. Each tube is a long, thin, glassy filament.
-- **Material/light:** custom shader — **fresnel rim lighting + fake sub-surface light
-  scattering** (edges glow, light appears to pass through). Bloom (existing `post.js`)
-  makes highlights bleed = volumetric feel.
-- **Motion:** noise field animates over time (tubes perpetually reflow). Cursor adds a
-  curl-noise distortion pushing the field away from the pointer (reuse pointer-physics
-  pattern from current `heroScene.js`).
-
-### Pulsar's own twist (homage, not clone)
-- **Palette lock** to existing tokens: violet `#6533FF` → cyan `#31C6E8` along tube
-  length, lime `#B8FF2C` as scatter/edge accent. (Lusion is warm/mono; ours is
-  electric violet-lime — distinct at a glance.)
-- **The Pulsar beat (the differentiator):** every ~2.4s a bright energy pulse travels
-  down the length of every tube (a moving intensity band in the shader) — a heartbeat
-  firing through the filaments. Ties the new hero to the name + existing identity.
-- **Composition:** tubes converge toward a bright core at screen-right (echoes current
-  blob-cluster composition) — reads as energy streaming into a pulsar.
-
-### Scroll behavior
-Camera flies forward; tubes part and stream *past* the camera (fly *through* the tangle),
-opening out into the intro station. True Z-depth, not a fade.
-
-### Reference implementation path
-Codrops "Curly Tubes from the Lusion Website" article + its open GitHub gist + Yuri
-Artiukh's recorded build session — a vetted starting point to restyle and rhythm-sync.
-
-### Performance
-Tube geometry is the expensive part. Cap tube count (desktop ~8–12, low-power ~3),
-compute paths on GPU where possible, target < ~4ms/frame mid-laptop. Mobile → baked
-video loop of this exact hero.
+### Phase 1 exit criteria (must verify with build output + a real device/throttle)
+- `three` chunk ≤ 150 KB; critical-path JS ≤ ~180 KB.
+- WebGL loads lazily (confirmed in network waterfall).
+- No visual regression vs. current site.
 
 ---
 
-## 4. Project Gallery Corridor & Case-Study Rooms
+## 3. Phase 2 — Bolder Art Direction (design-only, zero added JS)
 
-The centerpiece of "add my real projects." A **corridor in Z-depth** where each real
-client project is a **station / 3D room** entered, explored, and exited on scroll.
+Make it feel expensive purely through design. This is where "bland" gets fixed.
 
-### Corridor pass
-Flying the main spline, each project appears as a large floating panel/portal showing
-the project's hero screenshot on a subtly warped plane (reuse `data-gl-img` displacement),
-with title + sector + year in mono type. Hover → panel leans, image parallaxes with depth.
+- **Commit to the dark theme.** Move base to near-black `#0D0D0F` (already a palette token);
+  violet `#6533FF` / cyan `#31C6E8` / lime `#B8FF2C` become luminous accents. Dark makes the
+  existing bloom read as luxurious instead of washed out. (Light mode optional toggle; dark is
+  the identity.)
+- **Oversized kinetic typography.** Push variable Archivo to viewport-scale display weights for
+  section titles; JetBrains Mono as the technical counterpoint for labels/metadata. One
+  expressive headline moment per section.
+- **Dramatic negative space + cinematic pacing.** More breathing room; deliberate emptiness
+  before big moments. Confidence reads as premium.
+- **Light & grain.** Keep film grain (`_grain.scss`); add subtle vignette + refine bloom so the
+  frame feels *lit*, not flat.
+- **Refined color/light system** documented in `_tokens.scss` so it's consistent site-wide.
 
-### Entering a room
-Click/scroll into a project → camera **branches off the main spline** into that project's
-dedicated room (scene-per-project). Room contains:
-- Live screenshot(s) presented large.
-- Story: brief → approach → results.
-- Real metrics as big animated numbers.
-- **Live browser frame** — framed `<iframe>` of the real client URL — plus prominent
-  **"Visit live site ↗"** action. This is the credibility payload: real, working, clickable proof.
-
-### Data model
-Extend `src/data/projects.js`: add `url` (live link) and real `screenshots[]`; keep
-`brief / approach / quote / stats`. Replacing the 8 fictional entries with real ones =
-edit this file + drop in captured screenshots. Every project auto-generates its corridor
-panel and room.
-
-### Flow
-Exiting a room rejoins the corridor at the next project (existing `nextProject()` logic) —
-continuous, no reload.
-
-### Mobile fork
-Corridor → vertical scroll of rich cards; rooms → clean full-screen case-study pages with
-live-site embed. Same content, flat presentation.
+No new dependencies, no JS weight. Pure SCSS + markup.
 
 ---
 
-## 5. Transitions, Cursor & Micro-interactions
+## 4. Phase 3 — Rich Micro-interactions (cheap weight, high felt-quality)
 
-- **No page reloads.** Navigation = camera flight with weighted/inertial easing (Lusion
-  "real physics" feel). `veil` repurposed as an accent on fast-travel deep-link jumps,
-  not every click.
-- **Custom cursor states:** magnetic blob cursor gains contextual labels — "Explore"
-  (corridor), "Enter ↗" (project), "Visit site" (live embed), "Drag" (draggable). Cursor
-  subtly refracts the WebGL behind it near interactive elements.
-- **Choreographed scroll copy:** keep `data-scrub-words` / `data-reveal` split-text;
-  tighten timing so text scatters/reforms as stations enter.
-- **Micro-details:** magnetic buttons (have), scroll-velocity RGB aberration (have),
-  side scroll-progress + station indicator, optional sound-on-hover (off by default),
-  refined preloader previewing the tubes assembling as assets load.
+The connective tissue that makes a site feel alive and expensive. Most primitives already
+exist; we elevate + unify them.
 
----
+- **Contextual custom cursor.** Extend the existing magnetic blob cursor with state labels —
+  "Explore", "Open", "Visit site ↗", "Drag". Subtle scale/refract near interactive elements.
+- **Scatter/reform text.** Tighten the existing `data-scrub-words` / split-text so headlines
+  scatter and reform on scroll-in (the 2026 premium pattern).
+- **Magnetic everything + alive hover states.** Extend magnetic behavior to key CTAs; buttons,
+  links, and cards get considered hover/active micro-states (not default transitions).
+- **Page-transition choreography.** Refine the existing `veil` transition timing so navigation
+  feels intentional and weighted, not abrupt.
+- **Micro-details.** Side scroll-progress + section indicator; refined preloader; scroll-velocity
+  aberration retained but tuned; optional off-by-default hover sound.
 
-## 6. Visual System — Typography, Color, Layout
-
-- **Commit to dark theme.** Near-black `#0D0D0F` base (already in palette tokens); violet/
-  cyan/lime as luminous accents. Light mode optional toggle, but dark is the identity.
-  (Current light `#F2F1EF` fights the neon.)
-- **Typography as spectacle:** variable Archivo pushed to oversized editorial display
-  weights (viewport-scale titles); JetBrains Mono as technical counterpoint for labels/
-  metadata. One expressive kinetic headline per section reacting to scroll.
-- **Space & pacing:** more breathing room, cinematic vertical rhythm, deliberate emptiness
-  before big moments.
-- **Grain + light:** keep film grain (`_grain.scss`); add subtle vignette + chromatic
-  bloom so the frame feels lit, not flat.
+All built on GSAP you already ship — negligible added weight.
 
 ---
 
-## 7. Performance, Accessibility & Fallback
+## 5. Phase 4 — Interactive Project Rooms (real client work)
 
-Guardrails so "maximalist" ≠ "broken on half of devices."
+Replace fictional placeholders with real projects, presented richly. NOT the heavy persistent-
+world version — self-contained, performant case-study experiences.
 
-### Performance budget
-- 60fps desktop / 30fps floor mobile; < 3s time-to-interactive.
-- Distance-culling: only 1–2 stations render at once.
-- Texture compression (KTX2/basis) for screenshots; lazy-load rooms on approach.
-
-### Three-tier quality (via existing `quality.js` + `lowPower` / `reducedMotion`)
-- **Full** — all live WebGL.
-- **Reduced** — fewer tubes, simpler shaders.
-- **Baked** — hero video loop + flat scroll (mobile default).
-- Auto-detected, with manual override.
-
-### Accessibility
-- `prefers-reduced-motion` fully honored (static/baked, no camera flight).
-- Every station keyboard-navigable; live-site embeds have real `<a>` fallbacks.
-- All copy in real DOM (SEO + screen readers); canvas decorative (`aria-hidden`).
-- Real URLs preserved per project (History API) — pages shareable + indexable.
-
-### Progressive boot
-Site readable/usable before WebGL finishes; heavy assets stream in; no blank-screen wait.
+- **Data model.** Extend `src/data/projects.js`: add `url` (live client link) and real
+  `screenshots[]`; keep `brief / approach / quote / stats`. Swapping placeholders for real work
+  = edit this file + add compressed screenshots.
+- **Project index.** Elevate the existing work grid/cards with the new art direction + micro-
+  interactions: warped-image hover (reuse `data-gl-img` displacement), lean-on-hover, mono
+  metadata.
+- **Case-study "room" per project.** A rich single-project page (keeps real URL `/projects/<slug>`
+  for SEO/shareability): large screenshots, story (brief → approach → results), metrics as big
+  animated numbers, client quote, and a **live browser frame** — a framed `<iframe>` of the real
+  client URL — plus a prominent **"Visit live site ↗"** action. Live, working, clickable proof
+  is the credibility payload.
+- **Performance-safe embeds.** `<iframe>` lazy-loaded (`loading="lazy"`), only mounted when the
+  room is in view; static screenshot shown until then; real `<a>` fallback always present.
+- **Next-project flow.** Reuse existing `nextProject()` for continuous browsing.
 
 ---
 
-## 8. Open Items / User Inputs Needed
+## 6. Sequencing & Rationale
 
-- **Real project data:** for each live client site — slug, title, sector, year, tags,
-  roles, brief, approach, quote (+author), 3 metrics, **live URL**, and screenshots
-  (desktop + mobile, key pages). User will capture screenshots.
-- **Number of real projects** to feature (current placeholder count is 8).
-- **Baked-asset tooling:** whether the user can produce a pre-rendered hero video for the
-  mobile/baked tier, or whether we generate it from the real-time scene (e.g. capture a
-  canvas recording) as the fallback source.
-- **Light-mode toggle:** keep as option, or go dark-only.
+Order is deliberate and non-negotiable:
+1. **Phase 1 (perf) first** — you cannot judge "bland" fairly on a slow site, and you can't add
+   features onto a heavy base. Fast foundation first.
+2. **Phase 2 (art direction)** — highest wow-per-effort, zero weight; likely fixes most of "bland."
+3. **Phase 3 (micro-interactions)** — cheap, big felt-quality lift.
+4. **Phase 4 (project rooms)** — needs real user data (URLs + screenshots) to become real.
+
+Each phase is independently shippable and independently reviewable.
 
 ---
 
-## 9. Out of Scope (YAGNI)
+## 7. Open Items / User Inputs Needed
 
-- CMS integration (project data stays in `projects.js` for now).
-- Real Houdini/Redshift sim pipeline (we use curl-noise real-time + optional canvas-captured
-  baked fallback, not a full DCC render farm).
-- Multilingual content.
-- Sound design beyond an optional off-by-default hover toggle.
+- **Real project data:** per live client site — slug, title, sector, year, tags, roles, brief,
+  approach, quote (+author), 3 metrics, **live URL**, screenshots (desktop + mobile, key pages).
+- **Number of real projects** to feature (placeholder count is 8).
+- **Light-mode toggle:** keep as option, or dark-only.
+- **Live-embed policy:** confirm client sites allow iframing (some set `X-Frame-Options`); if a
+  site blocks embedding, fall back to a screenshot + "Visit live site ↗" for that project.
+
+---
+
+## 8. Out of Scope (YAGNI)
+
+- Persistent-world camera architecture (deferred — not chosen).
+- Curly-tube volumetric hero (deferred — not chosen).
+- Rebuilding the GL layer on a lighter engine (OGL) — the tree-shake gets most of the win
+  without a rewrite.
+- CMS integration (project data stays in `projects.js`).
+- Multilingual content; full sound design.
+
+---
+
+## 9. Notes for Verification
+
+- Phase 1 success is **measurable** — re-run `vite build`, compare chunk sizes, check a network
+  waterfall on throttled mobile. Do not claim "faster" without the numbers.
+- Phases 2–4 verified visually + on a real device, plus a Lighthouse/perf check to confirm the
+  new features didn't regress the Phase 1 gains.
