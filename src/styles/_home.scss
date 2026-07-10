@@ -65,7 +65,7 @@
 
 /* ----------------------------------------------------------------- intro */
 .intro {
-  padding: clamp(6rem, 20vh, 14rem) var(--gutter);
+  padding: var(--section-y) var(--gutter);
   max-width: var(--max-w);
   margin-inline: auto;
 }
@@ -73,9 +73,9 @@
 .intro__para {
   font-size: var(--fs-big-para);
   font-weight: 540;
-  letter-spacing: -0.02em;
-  line-height: 1.18;
-  max-width: 26ch;
+  letter-spacing: -0.025em;
+  line-height: 1.16;
+  max-width: 28ch;
   margin-bottom: clamp(2rem, 5vh, 3.5rem);
 }
 
@@ -205,7 +205,7 @@ html.touch .work-card {
 
 /* ------------------------------------------------------------ philosophy */
 .philosophy {
-  padding: clamp(6rem, 18vh, 13rem) 0;
+  padding: var(--section-y) 0;
 }
 
 .philosophy__title {

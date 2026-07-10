@@ -34,6 +34,8 @@
   --max-w: 1680px;
   --gutter: clamp(16px, 2.5vw, 40px);
   --header-h: 84px;
+  /* cinematic vertical rhythm — generous, confident negative space */
+  --section-y: clamp(7rem, 22vh, 16rem);
 
   /* motion */
   --ease-out: cubic-bezier(0.19, 1, 0.22, 1);
