@@ -105,15 +105,25 @@ varying float vNoise;
 // without an actual cubemap texture (zero bandwidth, one function).
 vec3 envSample(vec3 dir) {
   vec3 sky = mix(vec3(0.04, 0.05, 0.09), vec3(0.55, 0.60, 0.78), dir.y * 0.5 + 0.5);
-  float key = pow(max(dot(dir, normalize(vec3(0.5, 0.8, 0.35))), 0.0), 24.0);
-  float rim = pow(max(dot(dir, normalize(vec3(-0.6, 0.3, -0.5))), 0.0), 8.0);
+  // pow() base is clamped to a tiny epsilon (never exactly 0). On Apple-silicon
+  // / ANGLE-Metal, pow(0.0, x) evaluates via exp(x*log(0)) → NaN, which renders
+  // as opaque BLACK and gets smeared into square blocks by the bloom downscale
+  // (user report: "black squares in the middle of the bubbles"). Other GPUs
+  // return 0 and never showed it. max(…, 1e-4) makes it well-defined everywhere.
+  float key = pow(max(dot(dir, normalize(vec3(0.5, 0.8, 0.35))), 1e-4), 24.0);
+  float rim = pow(max(dot(dir, normalize(vec3(-0.6, 0.3, -0.5))), 1e-4), 8.0);
   return sky + key * vec3(1.4, 1.3, 1.1) + rim * vec3(0.4, 0.9, 0.3);
 }
 
 void main() {
   vec3 N = normalize(vNormal);
   vec3 V = normalize(vView);
-  float fres = pow(1.0 - max(dot(N, V), 0.0), 2.4);
+  // Fresnel: the pow base is (1 - dot(N,V)), which is exactly 0 where the
+  // surface faces the camera head-on — i.e. the CENTRE of each blob. On
+  // Apple-silicon/ANGLE-Metal pow(0.0, 2.4) → NaN → an opaque black block right
+  // in the middle of the bubble (user's exact symptom). Clamp the base to a
+  // tiny epsilon so it's always well-defined; visually identical elsewhere.
+  float fres = pow(max(1.0 - max(dot(N, V), 0.0), 1e-4), 2.4);
 
   // iridescent base
   float sweep = smoothstep(-0.7, 0.8, vNoise + sin(uTime * 0.3 + uHueShift * 6.283) * 0.35 + N.y * 0.4);
