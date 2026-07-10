@@ -82,19 +82,12 @@ async function boot() {
   const router = new Router({ veil: createVeil() });
   const page = router.start();
 
-  // drive the global scroll-progress rail (0..1 over the whole document).
-  // A single persistent ScrollTrigger with end:'max' auto-recalculates on
-  // ScrollTrigger.refresh(), which the router already calls after each nav.
-  const railFill = scrollRail.querySelector('[data-scroll-rail]');
-  if (railFill) {
-    ScrollTrigger.create({
-      start: 0,
-      end: 'max',
-      onUpdate: (self) => {
-        railFill.style.transform = `scaleY(${self.progress.toFixed(4)})`;
-      },
-    });
-  }
+  // The scroll-rail fill is driven entirely by CSS scroll-driven animation
+  // (animation-timeline: scroll()) — see _chrome.scss. That runs on the
+  // compositor with ZERO per-frame main-thread work. An earlier JS version
+  // (a ScrollTrigger writing transform every scroll tick to a will-change'd
+  // element) halved framerate to 30fps by thrashing the compositor against
+  // the live WebGL canvas; the CSS timeline has no such cost.
 
   if (import.meta.env.DEV) {
     // QA hooks: leak checks + tween inspection across navigations.

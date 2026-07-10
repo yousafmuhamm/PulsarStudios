@@ -23,7 +23,20 @@
   background: linear-gradient(var(--accent), var(--accent-3));
   transform-origin: top center;
   transform: scaleY(0);
-  will-change: transform;
+  /* Driven purely by the compositor via a scroll-driven animation — no JS,
+     no per-frame main-thread writes (the old JS driver tanked FPS to 30).
+     Where animation-timeline is unsupported the rail just stays empty. */
+  animation: scroll-rail-fill linear both;
+  animation-timeline: scroll(root block);
+}
+
+@keyframes scroll-rail-fill {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+html.reduced-motion .scroll-rail__fill {
+  animation: none;
 }
 
 @media (max-width: 720px) {
