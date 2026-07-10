@@ -45,9 +45,9 @@ main {
 h1,
 h2,
 h3 {
-  font-weight: 560;
+  font-weight: var(--wt-heading);
   letter-spacing: var(--ls-tight);
-  line-height: 1.02;
+  line-height: 1.0;
   text-wrap: balance;
 }
 

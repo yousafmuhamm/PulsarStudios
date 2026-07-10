@@ -23,7 +23,10 @@
 }
 
 .hero__title {
-  font-size: min(var(--fs-hero), 12.5vh);
+  font-size: min(var(--fs-hero), 13vh);
+  font-weight: var(--wt-display);
+  letter-spacing: var(--ls-display);
+  line-height: 0.96;
   max-width: 14ch;
   margin-bottom: clamp(2.5rem, 8vh, 6rem);
 }

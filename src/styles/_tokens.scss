@@ -15,14 +15,20 @@
   /* type */
   --font-display: 'Archivo', 'Helvetica Neue', Helvetica, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
-  --fs-hero: clamp(2.8rem, 8vw, 9rem);
-  --fs-h2: clamp(2rem, 5vw, 4.5rem);
-  --fs-h3: clamp(1.4rem, 2.6vw, 2.4rem);
+  /* Oversized display scale (Phase 2). Bigger, more confident headlines with
+     tighter optical tracking at scale — big type reads best slightly negative. */
+  --fs-hero: clamp(3rem, 9.2vw, 10.5rem);
+  --fs-h2: clamp(2.2rem, 5.8vw, 5.5rem);
+  --fs-h3: clamp(1.4rem, 2.6vw, 2.5rem);
   --fs-body: clamp(1rem, 1.1vw, 1.25rem);
-  --fs-big-para: clamp(1.5rem, 3.2vw, 3rem);
+  --fs-big-para: clamp(1.6rem, 3.4vw, 3.2rem);
   --fs-mono: 0.72rem;
-  --ls-tight: -0.03em;
-  --ls-mono: 0.1em;
+  --ls-tight: -0.035em; /* headings */
+  --ls-display: -0.05em; /* hero / huge display — tighter still */
+  --ls-mono: 0.12em;
+  /* weights (Archivo is variable 100–900) */
+  --wt-display: 640; /* hero + big section titles — heftier, more premium */
+  --wt-heading: 580;
 
   /* layout */
   --max-w: 1680px;
