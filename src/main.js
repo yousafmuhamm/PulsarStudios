@@ -41,6 +41,15 @@ grain.className = 'grain';
 grain.setAttribute('aria-hidden', 'true');
 document.body.appendChild(grain);
 
+// global scroll-progress rail — a thin vertical line on the right edge that
+// fills as you move through the page. Persists across navigations (lives
+// outside <main>), driven by the ScrollTrigger set up in boot().
+const scrollRail = document.createElement('div');
+scrollRail.className = 'scroll-rail';
+scrollRail.setAttribute('aria-hidden', 'true');
+scrollRail.innerHTML = '<span class="scroll-rail__fill" data-scroll-rail></span>';
+document.body.appendChild(scrollRail);
+
 // Boot is spread across macrotasks so no single task blocks the main
 // thread for long (TBT); the preloader covers the screen throughout.
 const nextTask = () => new Promise((r) => setTimeout(r, 0));
@@ -72,6 +81,20 @@ async function boot() {
 
   const router = new Router({ veil: createVeil() });
   const page = router.start();
+
+  // drive the global scroll-progress rail (0..1 over the whole document).
+  // A single persistent ScrollTrigger with end:'max' auto-recalculates on
+  // ScrollTrigger.refresh(), which the router already calls after each nav.
+  const railFill = scrollRail.querySelector('[data-scroll-rail]');
+  if (railFill) {
+    ScrollTrigger.create({
+      start: 0,
+      end: 'max',
+      onUpdate: (self) => {
+        railFill.style.transform = `scaleY(${self.progress.toFixed(4)})`;
+      },
+    });
+  }
 
   if (import.meta.env.DEV) {
     // QA hooks: leak checks + tween inspection across navigations.

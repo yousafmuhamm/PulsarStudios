@@ -1,3 +1,37 @@
+/* ------------------------------------------------- global scroll rail */
+/* thin vertical progress line on the right edge; fills top→down as you
+   scroll the whole document. Subtle track, electric accent fill. */
+.scroll-rail {
+  position: fixed;
+  top: 50%;
+  right: clamp(10px, 1.4vw, 22px);
+  transform: translateY(-50%);
+  width: 2px;
+  height: clamp(120px, 22vh, 240px);
+  border-radius: 2px;
+  background: rgba(242, 241, 239, 0.12);
+  z-index: var(--z-header);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.scroll-rail__fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(var(--accent), var(--accent-3));
+  transform-origin: top center;
+  transform: scaleY(0);
+  will-change: transform;
+}
+
+@media (max-width: 720px) {
+  .scroll-rail {
+    display: none; /* declutter on small screens */
+  }
+}
+
 /* ---------------------------------------------------------------- header */
 .header {
   position: fixed;
