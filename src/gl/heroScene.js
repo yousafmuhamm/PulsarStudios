@@ -93,7 +93,15 @@ export function createHeroScene() {
     // blending). Without this override, overlapping front/back-lit regions
     // of each sphere accumulate near-full color on every blend, washing the
     // whole cluster out to white (Task C finding).
-    material.setBlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    // Separate alpha blend so sceneRT accumulates PREMULTIPLIED content, which
+    // is what the bloom composite (oglPost.js) reads ("premultiplied →
+    // transparent = 0"). RGB uses straight (SRC_ALPHA, ONE_MINUS_SRC_ALPHA)
+    // against the zero-cleared target → stores col*alpha (premultiplied). The
+    // ALPHA channel must use (ONE, ONE_MINUS_SRC_ALPHA) so coverage accumulates
+    // correctly instead of the two-arg form's srcA*srcA under-accumulation,
+    // which drained the alpha and washed the blobs to near-invisible. This
+    // mirrors Three's premultipliedAlpha blendFuncSeparate for the sceneRT.
+    material.setBlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     const mesh = new OGL.Mesh(gl, { geometry, program: material });
     mesh.scale.set(cfg.r, cfg.r, cfg.r);
     mesh.setParent(group);
