@@ -1,12 +1,16 @@
 :root {
-  /* palette */
-  --bg: #f2f1ef;
-  --ink: #0d0d0f;
-  --paper: #f2f1ef;
-  --accent: #6533ff;
-  --accent-2: #b8ff2c;
-  --muted: #6b6b70; /* 4.7:1 on --bg (WCAG AA for the 11–12px mono labels) */
-  --line: rgba(13, 13, 15, 0.14);
+  /* palette — dark theme (Phase 2). Near-black base with electric accents so
+     the WebGL bloom reads as luminous. --bg is the page; --ink is the primary
+     text ON that dark page; --paper is the surface color (same as bg now).
+     Light sections opt back in via .section--light (see _base.scss). */
+  --bg: #0d0d0f; /* near-black base */
+  --ink: #f2f1ef; /* primary text — warm off-white on the dark base */
+  --paper: #0d0d0f; /* surface color (now dark, matches bg) */
+  --accent: #6533ff; /* violet */
+  --accent-2: #b8ff2c; /* lime */
+  --accent-3: #31c6e8; /* cyan — third electric accent, matches the hero blobs */
+  --muted: #97979d; /* 4.6:1 on #0d0d0f — WCAG AA for the 11–12px mono labels */
+  --line: rgba(242, 241, 239, 0.16);
 
   /* type */
   --font-display: 'Archivo', 'Helvetica Neue', Helvetica, sans-serif;

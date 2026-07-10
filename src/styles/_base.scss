@@ -132,19 +132,26 @@ sup {
   margin-bottom: clamp(1.2rem, 2.5vw, 2.4rem);
 }
 
-.section--dark,
-.menu,
-.contact,
-.preloader,
-.reel {
-  /* lighter muted so the small mono labels stay AA on ink */
-  --muted: #97979d;
+/* The whole site is dark now (see _tokens.scss). .section--dark used to
+   invert light sections to dark; it's kept as an explicit no-op so existing
+   markup (footer, philosophy) keeps working and reads intentionally dark.
+   Overlays already inherit the dark base. --muted is already tuned for dark. */
+.section--dark {
+  background: var(--bg);
+  color: var(--ink);
+  --line: rgba(242, 241, 239, 0.16);
 }
 
-.section--dark {
-  background: var(--ink);
-  color: var(--paper);
-  --line: rgba(242, 241, 239, 0.16);
+/* Opt-in LIGHT section — for contrast rhythm against the dark base. Flips the
+   local palette so a section (and its children, via the CSS variables) renders
+   dark-on-light, breaking up the darkness where a moment of brightness helps. */
+.section--light {
+  background: #f2f1ef;
+  color: #0d0d0f;
+  --ink: #0d0d0f;
+  --paper: #f2f1ef;
+  --muted: #6b6b70; /* 4.7:1 on #f2f1ef — AA for mono labels */
+  --line: rgba(13, 13, 15, 0.14);
 }
 
 .container {

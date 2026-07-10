@@ -38,7 +38,7 @@ export function head({ title, description, path }) {
 <meta property="og:url" content="${url}">
 <meta property="og:image" content="https://pulsarstudios.com/assets/img/og.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#F2F1EF">
+<meta name="theme-color" content="#0D0D0F">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/fonts/archivo-var-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/jetbrainsmono-var-latin.woff2" as="font" type="font/woff2" crossorigin>
