@@ -140,9 +140,26 @@ class GL {
   add(scene) {
     if (!this.renderer) return;
     scene.resize(window.innerWidth, window.innerHeight);
-    // OGL has no compileAsync (no KHR_parallel_shader_compile hook), so
-    // mount synchronously — programs link on first draw call instead.
     if (scene._removed) return;
+    // OGL has no compileAsync (no KHR_parallel_shader_compile). Programs link
+    // in their constructor, but most drivers defer the real cost — final
+    // program validation + GPU upload — to the first draw that USES the
+    // program. Under the live ticker that first draw lands on a visible frame,
+    // producing a startup stutter (Three sidesteps this with compileAsync).
+    // So warm the scene here with one off-loop render into the scene target,
+    // absorbing the first-draw cost now (the preloader still covers the
+    // screen), so the scene enters the ticker already hot.
+    if (!reducedMotion && scene.scene && scene.camera) {
+      try {
+        if (this.post) this.post.begin();
+        scene.render(0, 1 / 60);
+        // discard the warm frame so it never reaches the screen unbloomed
+        this.renderer.gl.bindFramebuffer(this.renderer.gl.FRAMEBUFFER, null);
+        this.renderer.gl.clear(this.renderer.gl.COLOR_BUFFER_BIT | this.renderer.gl.DEPTH_BUFFER_BIT);
+      } catch {
+        /* warm-up is best-effort; a failure here must never block mounting */
+      }
+    }
     this.scenes.add(scene);
     if (reducedMotion) this.renderOnce();
   }
