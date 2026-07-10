@@ -206,7 +206,22 @@ sup {
   white-space: nowrap;
   position: relative;
   overflow: hidden;
-  transition: color var(--dur-hover) var(--ease-out);
+  transition:
+    color var(--dur-hover) var(--ease-out),
+    transform 0.35s var(--ease-out);
+}
+
+/* subtle tactile lift on hover — reads as "alive" without being bouncy.
+   IMPORTANT: only on NON-magnetic pills. The magnetic script drives the
+   element's transform via GSAP x/y (translate); a CSS `transform: scale` here
+   is a single property that would OVERWRITE that translate and cancel the
+   magnetic pull. Magnetic pills get their aliveness from the magnetism itself. */
+.pill:not([data-magnetic]):hover {
+  transform: scale(1.03);
+}
+
+.pill:not([data-magnetic]):active {
+  transform: scale(0.98);
 }
 
 .pill--ghost {
@@ -234,7 +249,9 @@ sup {
 }
 
 .pill:hover {
-  color: var(--paper);
+  /* text must read on the violet fill — always light, regardless of theme
+     role of --paper (which is dark now) */
+  color: #f2f1ef;
 }
 
 .pill > * {
