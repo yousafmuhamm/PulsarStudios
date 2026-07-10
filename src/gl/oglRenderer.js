@@ -74,6 +74,15 @@ class GL {
     // no-op with no console error). Must request this before oglPost builds
     // its half-float RenderTargets below (Task C finding).
     this.renderer.gl.getExtension('EXT_color_buffer_float');
+    // ...and OES_texture_float_linear so the bloom/composite passes can
+    // LINEARLY SAMPLE those half-float targets. Most desktop GL backends allow
+    // half-float linear filtering implicitly, but ANGLE-on-Metal (Apple
+    // silicon) strictly enforces the spec: without this extension, a LINEAR
+    // fetch from a HALF_FLOAT texture returns ZEROS — silently, no error — so
+    // the composite reads black and the whole hero vanishes on M-series Macs
+    // while rendering fine elsewhere. Three's WebGLRenderer requests this
+    // internally; OGL does not. (Root cause of "bubbles gone on M3 Pro".)
+    this.renderer.gl.getExtension('OES_texture_float_linear');
     this.setSize();
 
     if (POST_ENABLED) {
