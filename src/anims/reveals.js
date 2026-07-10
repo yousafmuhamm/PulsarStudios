@@ -79,7 +79,35 @@ export class RevealManager {
     const make = () => {
       let targets;
       let vars;
-      if (kind === 'lines' || kind === 'words' || kind === 'chars') {
+      if (kind === 'scatter') {
+        // chars fly in from random offsets/rotation and settle home — the
+        // "type that scatters and reforms" premium reveal. Reduced-motion
+        // degrades to a plain fade (no scatter) via the branch below.
+        entry.split = new Split(el, 'chars');
+        targets = entry.split.targets();
+        if (reducedMotion) {
+          gsap.set(targets, { autoAlpha: 0 });
+          vars = { autoAlpha: 1, duration: 0.5, ease: 'none', stagger: 0.01 };
+        } else {
+          targets.forEach((ch) => {
+            gsap.set(ch, {
+              xPercent: gsap.utils.random(-90, 90),
+              yPercent: gsap.utils.random(-140, 140),
+              rotate: gsap.utils.random(-45, 45),
+              autoAlpha: 0,
+            });
+          });
+          vars = {
+            xPercent: 0,
+            yPercent: 0,
+            rotate: 0,
+            autoAlpha: 1,
+            duration: 1.1,
+            ease: 'expo.out',
+            stagger: { each: 0.02, from: 'random' },
+          };
+        }
+      } else if (kind === 'lines' || kind === 'words' || kind === 'chars') {
         entry.split = new Split(el, kind);
         targets = entry.split.targets();
         vars =

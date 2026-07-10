@@ -38,7 +38,7 @@ export function renderHome(projects) {
 <section class="work" data-work aria-label="Featured work">
   <header class="work__head">
     <p class="mono eyebrow" data-reveal="fade">Featured Work</p>
-    <h2 class="work__title" data-reveal="lines">Six projects that moved the numbers that matter</h2>
+    <h2 class="work__title" data-reveal="scatter">Six projects that moved the numbers that matter</h2>
   </header>
   <div class="work__pin" data-work-pin>
     <div class="work__track" data-work-track>
