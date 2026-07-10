@@ -281,11 +281,17 @@ export function createHeroScene() {
 
       blobs.forEach((b) => {
         // depth parallax: blobs further back (more negative fz) shift LESS
-        // with the pointer than near ones → real 3D separation, not a flat tilt
+        // with the pointer than near ones → real 3D separation, not a flat tilt.
+        // Gate on pointerActive: pointerNdc initialises to the (10,10) offscreen
+        // sentinel, and applying that unconditionally shoved the whole cluster
+        // ~3.5 world-units off the right/bottom edge before the first mouse
+        // move — invisible on load. Only offset once the pointer is real.
         const depth = 1 + b.cfg.fz * 0.5; // ~0.6..1.15
+        const px = pointerActive ? pointerNdc.x : 0;
+        const py = pointerActive ? pointerNdc.y : 0;
         b.mesh.position.set(
-          b.pos.x + pointerNdc.x * 0.35 * depth,
-          b.pos.y + pointerNdc.y * 0.25 * depth,
+          b.pos.x + px * 0.35 * depth,
+          b.pos.y + py * 0.25 * depth,
           b.pos.z
         );
         b.material.uniforms.uTime.value = time;
