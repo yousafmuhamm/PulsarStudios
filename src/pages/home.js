@@ -4,15 +4,18 @@
  */
 import { gsap, ScrollTrigger } from '../core.js';
 import { basePage } from './base.js';
-import { glx } from '../gl/renderer.js';
-import { createHeroScene } from '../gl/heroScene.js';
-import { createCardsScene } from '../gl/cardsScene.js';
+import { loadGL } from '../main.js';
 import { isTouch, reducedMotion, qsa } from '../utils/env.js';
 
 export function createHomePage(main) {
   let hero = null;
   let cards = null;
   let killGlow = null;
+  let destroyed = false;
+  // ScrollTriggers/tweens created after the async GL chunk resolves land
+  // outside basePage's gsap.context() (setup() has already returned by
+  // then), so they aren't swept by ctx.revert() — track and kill them here.
+  let glTriggers = [];
 
   // opacity choreography: intro × scroll fade, overridden by the ghost pass
   const intro = { v: 0 };
@@ -22,6 +25,88 @@ export function createHomePage(main) {
     if (!hero) return;
     hero.state.opacity = Math.max(intro.v * (1 - scrollP * 0.96), ghost.v);
   };
+
+  // --- GL (lazy) ---------------------------------------------------------
+
+  let glx = null;
+  let entered = false;
+  let heroReady = false;
+
+  async function setupGL() {
+    const gl = await loadGL();
+    if (destroyed) return; // page torn down before the chunk resolved
+    glx = gl;
+
+    const { createHeroScene } = await import('../gl/heroScene.js');
+    if (destroyed) return;
+    const { createCardsScene } = await import('../gl/cardsScene.js');
+    if (destroyed) return;
+
+    hero = createHeroScene();
+    if (hero) {
+      glx.add(hero);
+      if (reducedMotion) {
+        intro.v = 1;
+        applyOpacity();
+        glx.renderOnce();
+      } else {
+        const heroEl = main.querySelector('[data-hero]');
+        glTriggers.push(
+          ScrollTrigger.create({
+            trigger: heroEl,
+            start: 'top top',
+            end: 'bottom top',
+            scrub: 0.6, // smoothing on the handoff — the cluster drifts, never snaps
+            onUpdate: (self) => {
+              scrollP = self.progress;
+              hero.state.y = -scrollP * 3.4;
+              hero.state.scale = 1 - scrollP * 0.3;
+              applyOpacity();
+            },
+          })
+        );
+
+        // faint return behind the dark philosophy section
+        const phil = main.querySelector('[data-philosophy]');
+        if (phil) {
+          const toGhost = (v) =>
+            gsap.to(ghost, { v, duration: 1.2, ease: 'power2.out', onUpdate: applyOpacity, overwrite: 'auto' });
+          glTriggers.push(
+            ScrollTrigger.create({
+              trigger: phil,
+              start: 'top 65%',
+              end: 'bottom 35%',
+              onEnter: () => toGhost(0.14),
+              onLeave: () => toGhost(0),
+              onEnterBack: () => toGhost(0.14),
+              onLeaveBack: () => toGhost(0),
+            })
+          );
+        }
+      }
+    }
+
+    cards = createCardsScene(qsa('[data-gl-img]', main));
+    if (cards) glx.add(cards);
+
+    heroReady = true;
+    // enter() may have already run (and found no hero yet) if the GL
+    // chunk resolved after the reveal — play the intro now instead.
+    if (entered) playHeroIntro();
+  }
+
+  function playHeroIntro() {
+    if (!hero || !heroReady || reducedMotion || hero._introPlayed) return;
+    hero._introPlayed = true;
+    // the cluster is already breathing in while the words reveal, so
+    // the page arrives "alive" instead of assembling piece by piece
+    gsap.fromTo(
+      hero.state,
+      { scale: 0.62 },
+      { scale: 1, duration: 2.4, ease: 'expo.out' }
+    );
+    gsap.to(intro, { v: 1, duration: 1.1, ease: 'power2.out', onUpdate: applyOpacity });
+  }
 
   return basePage(main, {
     setup() {
@@ -95,72 +180,30 @@ export function createHomePage(main) {
         };
       }
 
-      hero = createHeroScene();
-      if (hero) {
-        glx.add(hero);
-        if (reducedMotion) {
-          intro.v = 1;
-          applyOpacity();
-          glx.renderOnce();
-        } else {
-          const heroEl = main.querySelector('[data-hero]');
-          ScrollTrigger.create({
-            trigger: heroEl,
-            start: 'top top',
-            end: 'bottom top',
-            scrub: 0.6, // smoothing on the handoff — the cluster drifts, never snaps
-            onUpdate: (self) => {
-              scrollP = self.progress;
-              hero.state.y = -scrollP * 3.4;
-              hero.state.scale = 1 - scrollP * 0.3;
-              applyOpacity();
-            },
-          });
-
-          // faint return behind the dark philosophy section
-          const phil = main.querySelector('[data-philosophy]');
-          if (phil) {
-            const toGhost = (v) =>
-              gsap.to(ghost, { v, duration: 1.2, ease: 'power2.out', onUpdate: applyOpacity, overwrite: 'auto' });
-            ScrollTrigger.create({
-              trigger: phil,
-              start: 'top 65%',
-              end: 'bottom 35%',
-              onEnter: () => toGhost(0.14),
-              onLeave: () => toGhost(0),
-              onEnterBack: () => toGhost(0.14),
-              onLeaveBack: () => toGhost(0),
-            });
-          }
-        }
-      }
-
-      cards = createCardsScene(qsa('[data-gl-img]', main));
-      if (cards) glx.add(cards);
+      // GL is a separate async chunk (loaded by main.js after first paint).
+      // Kick off scene creation without blocking setup()/gsap.context(),
+      // which must stay synchronous. `destroyed` guards against the page
+      // being torn down (router nav away) before the chunk resolves.
+      setupGL();
     },
 
     enter() {
-      if (hero && !reducedMotion) {
-        // the cluster is already breathing in while the words reveal, so
-        // the page arrives "alive" instead of assembling piece by piece
-        gsap.fromTo(
-          hero.state,
-          { scale: 0.62 },
-          { scale: 1, duration: 2.4, ease: 'expo.out' }
-        );
-        gsap.to(intro, { v: 1, duration: 1.1, ease: 'power2.out', onUpdate: applyOpacity });
-      }
+      entered = true;
+      playHeroIntro();
     },
 
     destroy() {
+      destroyed = true;
       killGlow?.();
       killGlow = null;
+      glTriggers.forEach((t) => t.kill());
+      glTriggers = [];
       if (hero) {
-        glx.remove(hero);
+        glx?.remove(hero);
         hero = null;
       }
       if (cards) {
-        glx.remove(cards);
+        glx?.remove(cards);
         cards = null;
       }
     },

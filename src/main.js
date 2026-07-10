@@ -5,7 +5,6 @@
 import './styles/main.scss';
 import { gsap, ScrollTrigger, initScroll } from './core.js';
 import { isTouch, reducedMotion } from './utils/env.js';
-import { glx } from './gl/renderer.js';
 import { createVeil } from './gl/transitions.js';
 import { initCursor } from './anims/cursor.js';
 import { magnetize } from './anims/magnetic.js';
@@ -14,6 +13,22 @@ import { initMenu } from './ui/menu.js';
 import { initContact } from './ui/contact.js';
 import { initReel } from './ui/reel.js';
 import { Router } from './router.js';
+
+// The OGL layer (renderer + scenes + the `ogl` package, ~16.5KB gzip) is
+// split into its own async chunk so it never blocks first paint — the
+// canvas upgrades in once the chunk resolves. `loadGL()` is idempotent
+// (shared promise) so main.js and page modules can all await the same
+// init without racing or double-initializing.
+let glReady = null;
+export function loadGL() {
+  if (!glReady) {
+    glReady = import('./gl/renderer.js').then(({ glx }) => {
+      glx.init(document.querySelector('[data-gl]'));
+      return glx;
+    });
+  }
+  return glReady;
+}
 
 const html = document.documentElement;
 html.classList.add('js');
@@ -35,9 +50,6 @@ async function boot() {
   const preloaderDone = runPreloader();
 
   await nextTask();
-  glx.init(document.querySelector('[data-gl]'));
-
-  await nextTask();
   initCursor();
   magnetize(document); // header/menu chrome (page content re-scans on navigation)
   initMenu();
@@ -52,6 +64,12 @@ async function boot() {
   ]);
 
   await nextTask();
+  // Fire-and-forget: the GL chunk loads in the background after the
+  // critical chrome/first-paint path. Page modules (home.js) await
+  // loadGL() themselves before touching glx, so this doesn't need to
+  // block anything here — the preloader still covers the screen.
+  loadGL();
+
   const router = new Router({ veil: createVeil() });
   const page = router.start();
 
