@@ -92,7 +92,7 @@ ${footer({ nextHref: '/about.html', nextLabel: 'About Us' })}`;
 const TEAM = [
   {
     idx: '001',
-    name: 'Zain Khan',
+    name: 'Muhammad Yousaf',
     role: 'Founder & Creative Director',
     bio: 'Started Pulsar after six years directing digital work for studios on three continents. Believes a website is the one piece of brand you can actually feel.',
   },
