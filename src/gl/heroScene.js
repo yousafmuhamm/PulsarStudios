@@ -59,6 +59,14 @@ export function createHeroScene() {
       fragment: blobFragment,
       transparent: true,
       depthWrite: false,
+      // depthTest:false is deliberate. OGL re-sorts the `transparent` group
+      // (depthTest:true) back-to-front by z-depth EVERY frame; as the blobs
+      // drift in Z and their depths cross, that sort flips draw order and the
+      // translucent overlap visibly POPS. depthTest:false routes them to OGL's
+      // stable-order `ui` group instead (no per-frame z-resort), so overlaps
+      // composite in a consistent order — no pop. These blobs never depth-test
+      // against each other anyway (that's why the original set depthWrite:false).
+      depthTest: false,
       // Three's ShaderMaterial defaults `side: THREE.FrontSide` (back-face
       // culled) even though the original never set `side` explicitly.
       // OGL's Program also defaults cullFace to gl.BACK, so simply not
