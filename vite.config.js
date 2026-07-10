@@ -10,7 +10,7 @@ export default defineConfig({
       output: {
         advancedChunks: {
           groups: [
-            { name: 'three', test: /node_modules[\\/]three/ },
+            { name: 'ogl', test: /node_modules[\\/]ogl/ },
             { name: 'gsap', test: /node_modules[\\/](gsap|lenis)/ },
           ],
         },

@@ -10,7 +10,7 @@
  * docs/superpowers/plans/2026-07-09-ogl-port-subplan.md — "Scene-Target
  * Contract" — render() must draw into glx.sceneTarget, not the screen.
  */
-import { glx, OGL } from './oglRenderer.js';
+import { glx, OGL } from './renderer.js';
 import { blobVertex, blobFragment } from './shaders.js';
 import { lenis } from '../core.js';
 import { lowPower, reducedMotion } from '../utils/env.js';

@@ -1,5 +1,5 @@
 /**
- * GL postprocessing for the persistent canvas.
+ * OGL twin of `post.js` — GL postprocessing for the persistent canvas.
  *
  * The scene layer is a *transparent overlay* over the HTML page, so this
  * pass is written to preserve premultiplied alpha — bloom only brightens
@@ -7,27 +7,38 @@
  * so the CSS background (and page text) shows through untouched.
  *
  * Pipeline per frame:
- *   scenes ─▶ sceneRT (MSAA, half-float)
+ *   scenes ─▶ sceneRT (half-float)
  *            ├─▶ bright-pass ─▶ blur H ─▶ blur V   (half res, ×2 iterations)
  *            └─▶ composite (scene + bloom + scroll-velocity RGB split) ─▶ screen
  *
- * Owned and driven by renderer.js. Gated off on low-power / reduced-motion
+ * Owned and driven by oglRenderer.js. Gated off on low-power / reduced-motion
  * upstream, so this module assumes it should run when it exists.
+ *
+ * Framebuffer-state note: every pass below — including the final blit to
+ * the screen — goes through `renderer.render({ scene, camera, target })`.
+ * OGL's Renderer caches the currently-bound framebuffer in
+ * `renderer.state.framebuffer` and only issues `gl.bindFramebuffer` when
+ * that cache is stale (see `Renderer.bindFramebuffer`). If any code path
+ * here bound a framebuffer with raw `gl.bindFramebuffer` calls instead,
+ * the cache would go stale and a later `renderer.render({target: null})`
+ * could silently no-op the rebind, leaving the composite drawn into an
+ * offscreen target instead of the screen (black canvas). So this module
+ * never touches `gl.bindFramebuffer` directly — `renderer.render()` is the
+ * only thing that binds framebuffers, for every single pass, screen
+ * included, keeping the cache authoritative throughout.
  */
-import {
-  WebGLRenderTarget, HalfFloatType, LinearFilter, ClampToEdgeWrapping,
-  BufferGeometry, BufferAttribute, Camera, Scene, Mesh, ShaderMaterial,
-  Vector2, NoBlending,
-} from './three.js';
+import { Geometry, Camera, Mesh, Program, RenderTarget, Vec2 } from 'ogl';
 import { lenis } from '../core.js';
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 const BASE_VERT = /* glsl */ `
+attribute vec2 position;
+attribute vec2 uv;
 varying vec2 vUv;
 void main() {
   vUv = uv;
-  gl_Position = vec4(position, 1.0);
+  gl_Position = vec4(position, 0.0, 1.0);
 }`;
 
 const BRIGHT_FRAG = /* glsl */ `
@@ -77,67 +88,89 @@ void main() {
   gl_FragColor = vec4(rgb, a);
 }`;
 
-function makeRT(w, h, extra = {}) {
-  return new WebGLRenderTarget(Math.max(1, w), Math.max(1, h), {
-    depthBuffer: false,
-    stencilBuffer: false,
-    type: HalfFloatType,
-    magFilter: LinearFilter,
-    minFilter: LinearFilter,
-    wrapS: ClampToEdgeWrapping,
-    wrapT: ClampToEdgeWrapping,
-    ...extra,
+function makeRT(gl, w, h) {
+  return new RenderTarget(gl, {
+    width: Math.max(1, w),
+    height: Math.max(1, h),
+    depth: false,
+    stencil: false,
+    type: gl.HALF_FLOAT,
+    // WebGL2 requires a *sized* internal format for float/half-float color
+    // attachments — OGL's RenderTarget/Texture default internalFormat to
+    // the unsized `format` (RGBA), which texImage2D rejects when paired
+    // with HALF_FLOAT, leaving every RT here FRAMEBUFFER_INCOMPLETE_ATTACHMENT
+    // (scenes render into it as a silent no-op, no console error). Three's
+    // WebGLRenderer picks the sized format internally; OGL does not, so it
+    // must be passed explicitly here (Task C finding).
+    internalFormat: gl.renderer.isWebgl2 ? gl.RGBA16F : gl.RGBA,
+    magFilter: gl.LINEAR,
+    minFilter: gl.LINEAR,
+    wrapS: gl.CLAMP_TO_EDGE,
+    wrapT: gl.CLAMP_TO_EDGE,
   });
 }
 
 export function createPost(renderer) {
   const BLOOM_SCALE = 0.4; // bloom is inherently soft — quarter-ish res is plenty
+  const gl = renderer.gl;
 
   // fullscreen triangle
-  const geo = new BufferGeometry();
-  geo.setAttribute('position', new BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
-  geo.setAttribute('uv', new BufferAttribute(new Float32Array([0, 0, 2, 0, 0, 2]), 2));
-  const cam = new Camera();
-  const quadScene = new Scene();
-  const quad = new Mesh(geo);
-  quadScene.add(quad);
-  const blit = (mat) => {
-    quad.material = mat;
-    renderer.render(quadScene, cam);
-  };
+  const geo = new Geometry(gl, {
+    position: { size: 2, data: new Float32Array([-1, -1, 3, -1, -1, 3]) },
+    uv: { size: 2, data: new Float32Array([0, 0, 2, 0, 0, 2]) },
+  });
+  // no camera needed: BASE_VERT writes gl_Position directly from `position`,
+  // no MVP matrices involved — renderer.render() tolerates camera:undefined.
+  const cam = undefined;
 
-  const brightMat = new ShaderMaterial({
-    vertexShader: BASE_VERT,
-    fragmentShader: BRIGHT_FRAG,
+  const brightProg = new Program(gl, {
+    vertex: BASE_VERT,
+    fragment: BRIGHT_FRAG,
     depthTest: false,
     depthWrite: false,
+    cullFace: false,
     uniforms: {
       tMap: { value: null },
       uThreshold: { value: 0.55 },
       uKnee: { value: 0.28 },
     },
   });
-  const blurMat = new ShaderMaterial({
-    vertexShader: BASE_VERT,
-    fragmentShader: BLUR_FRAG,
+  const blurProg = new Program(gl, {
+    vertex: BASE_VERT,
+    fragment: BLUR_FRAG,
     depthTest: false,
     depthWrite: false,
-    uniforms: { tMap: { value: null }, uDir: { value: new Vector2() } },
+    cullFace: false,
+    uniforms: { tMap: { value: null }, uDir: { value: new Vec2() } },
   });
-  const compMat = new ShaderMaterial({
-    vertexShader: BASE_VERT,
-    fragmentShader: COMPOSITE_FRAG,
+  // Mirrors post.js's `transparent:true, blending:NoBlending` — Three's
+  // NoBlending forces a raw overwrite (no GL blend equation) even though
+  // the material is flagged transparent for sort-bucket purposes. OGL only
+  // enables gl.BLEND when a Program's blendFunc is set (see Program.js:
+  // `if (this.blendFunc.src) enable(BLEND)`), so simply never calling
+  // setBlendFunc / passing `transparent:true` here reproduces the same
+  // "compute final alpha in-shader, write it straight" behavior.
+  const compProg = new Program(gl, {
+    vertex: BASE_VERT,
+    fragment: COMPOSITE_FRAG,
     depthTest: false,
     depthWrite: false,
-    transparent: true,
-    blending: NoBlending,
+    cullFace: false,
     uniforms: {
       tScene: { value: null },
       tBloom: { value: null },
       uBloom: { value: 0.72 },
-      uAberr: { value: new Vector2() },
+      uAberr: { value: new Vec2() },
     },
   });
+
+  const quad = new Mesh(gl, { geometry: geo, program: brightProg });
+
+  // blit `prog` into `target` (target === null blits to the screen)
+  function blit(prog, target) {
+    quad.program = prog;
+    renderer.render({ scene: quad, camera: cam, target, sort: false, frustumCull: false, clear: true });
+  }
 
   let sceneRT, brightRT, blurA, blurB;
   let bw = 1;
@@ -147,17 +180,17 @@ export function createPost(renderer) {
   let extraShift = 0; // scroll-velocity RGB split boost, set per frame by the page
 
   function resize(w, h) {
-    const dpr = renderer.getPixelRatio();
+    const dpr = renderer.dpr || 1;
     const fw = Math.max(1, Math.round(w * dpr));
     const fh = Math.max(1, Math.round(h * dpr));
     bw = Math.max(1, Math.round(fw * BLOOM_SCALE));
     bh = Math.max(1, Math.round(fh * BLOOM_SCALE));
 
     if (!sceneRT) {
-      sceneRT = makeRT(fw, fh);
-      brightRT = makeRT(bw, bh);
-      blurA = makeRT(bw, bh);
-      blurB = makeRT(bw, bh);
+      sceneRT = makeRT(gl, fw, fh);
+      brightRT = makeRT(gl, bw, bh);
+      blurA = makeRT(gl, bw, bh);
+      blurB = makeRT(gl, bw, bh);
     } else {
       sceneRT.setSize(fw, fh);
       brightRT.setSize(bw, bh);
@@ -168,17 +201,16 @@ export function createPost(renderer) {
 
   // bind the offscreen target and clear it; scenes render into it as usual
   function begin() {
-    renderer.setRenderTarget(sceneRT);
-    renderer.clear();
+    renderer.bindFramebuffer(sceneRT);
+    renderer.setViewport(sceneRT.width, sceneRT.height);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   }
 
   // bloom + composite to screen
   function end() {
     // bright-pass
-    brightMat.uniforms.tMap.value = sceneRT.texture;
-    renderer.setRenderTarget(brightRT);
-    renderer.clear();
-    blit(brightMat);
+    brightProg.uniforms.tMap.value = sceneRT.texture;
+    blit(brightProg, brightRT);
 
     // separable gaussian — 4 passes at full quality, 2 when the tier drops
     // (halving blur passes is the cheapest big fill-rate win under stress)
@@ -194,12 +226,12 @@ export function createPost(renderer) {
             [brightRT, blurA, [1.3 / bw, 0]],
             [blurA, blurB, [0, 1.3 / bh]],
           ];
+    let lastDst = brightRT;
     for (const [src, dst, dir] of passes) {
-      blurMat.uniforms.tMap.value = src.texture;
-      blurMat.uniforms.uDir.value.set(dir[0], dir[1]);
-      renderer.setRenderTarget(dst);
-      renderer.clear();
-      blit(blurMat);
+      blurProg.uniforms.tMap.value = src.texture;
+      blurProg.uniforms.uDir.value.set(dir[0], dir[1]);
+      blit(blurProg, dst);
+      lastDst = dst;
     }
 
     // scroll-velocity → RGB split, smoothed, with a faint idle baseline.
@@ -207,13 +239,12 @@ export function createPost(renderer) {
     const v = lenis ? Math.abs(lenis.velocity || 0) : 0;
     const target = clamp((0.0006 + v * 0.00006 + extraShift) * quality, 0, 0.006);
     aberr += (target - aberr) * 0.15;
-    compMat.uniforms.uAberr.value.set(aberr, 0);
-    compMat.uniforms.uBloom.value = 0.5 + 0.22 * quality;
+    compProg.uniforms.uAberr.value.set(aberr, 0);
+    compProg.uniforms.uBloom.value = 0.5 + 0.22 * quality;
 
-    compMat.uniforms.tScene.value = sceneRT.texture;
-    compMat.uniforms.tBloom.value = blurB.texture;
-    renderer.setRenderTarget(null);
-    blit(compMat);
+    compProg.uniforms.tScene.value = sceneRT.texture;
+    compProg.uniforms.tBloom.value = lastDst.texture;
+    blit(compProg, null);
   }
 
   function setQuality(q) {
@@ -224,15 +255,26 @@ export function createPost(renderer) {
   }
 
   function dispose() {
-    geo.dispose();
-    brightMat.dispose();
-    blurMat.dispose();
-    compMat.dispose();
-    sceneRT?.dispose();
-    brightRT?.dispose();
-    blurA?.dispose();
-    blurB?.dispose();
+    gl.deleteProgram(brightProg.program);
+    gl.deleteProgram(blurProg.program);
+    gl.deleteProgram(compProg.program);
+    for (const key in geo.attributes) {
+      const attr = geo.attributes[key];
+      if (attr.buffer) gl.deleteBuffer(attr.buffer);
+    }
+    const deleteRT = (rt) => {
+      if (!rt) return;
+      rt.textures.forEach((t) => gl.deleteTexture(t.texture));
+      if (rt.depthBuffer) gl.deleteRenderbuffer(rt.depthBuffer);
+      if (rt.stencilBuffer) gl.deleteRenderbuffer(rt.stencilBuffer);
+      if (rt.depthStencilBuffer) gl.deleteRenderbuffer(rt.depthStencilBuffer);
+      gl.deleteFramebuffer(rt.buffer);
+    };
+    deleteRT(sceneRT);
+    deleteRT(brightRT);
+    deleteRT(blurA);
+    deleteRT(blurB);
   }
 
-  return { resize, begin, end, dispose, setQuality, setExtraShift };
+  return { resize, begin, end, dispose, setQuality, setExtraShift, sceneRT: () => sceneRT };
 }

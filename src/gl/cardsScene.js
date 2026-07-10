@@ -15,7 +15,7 @@
  * (Task C) for the scene-target contract and premultiplied-blend fix this
  * mirrors.
  */
-import { glx, OGL } from './oglRenderer.js';
+import { glx, OGL } from './renderer.js';
 import { cardVertex, cardFragment } from './shaders.js';
 import { gsap } from '../core.js';
 import { isTouch, reducedMotion } from '../utils/env.js';
