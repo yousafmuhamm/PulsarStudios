@@ -131,6 +131,15 @@ void main() {
 }`;
 
 export const cardVertex = /* glsl */ `
+precision highp float;
+// OGL (unlike Three.js) does not textually inject built-in attribute/uniform
+// declarations into shader source — see blobVertex above for the full
+// explanation. Declaring them here keeps the GLSL logic byte-identical
+// while satisfying OGL's compiler.
+attribute vec3 position;
+attribute vec2 uv;
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
 varying vec2 vUv;
 void main() {
   vUv = uv;

@@ -10,12 +10,12 @@
  *   2. lerp each plane toward its measured slot so any single-frame desync
  *      resolves as smooth motion instead of a visible jump
  * Perspective camera (not ortho) so the tilt reads as genuine 3D depth.
+ *
+ * OGL port (Task D): class-for-class swap from Three.js. See heroScene.js
+ * (Task C) for the scene-target contract and premultiplied-blend fix this
+ * mirrors.
  */
-import { glx } from './renderer.js';
-import {
-  Scene, PerspectiveCamera, PlaneGeometry, ShaderMaterial, Mesh, Vector2,
-  CanvasTexture, SRGBColorSpace, LinearFilter, ClampToEdgeWrapping,
-} from './three.js';
+import { glx, OGL } from './oglRenderer.js';
 import { cardVertex, cardFragment } from './shaders.js';
 import { gsap } from '../core.js';
 import { isTouch, reducedMotion } from '../utils/env.js';
@@ -23,7 +23,9 @@ import { isTouch, reducedMotion } from '../utils/env.js';
 export function createCardsScene(els) {
   if (!glx.ok || !els.length || reducedMotion) return null;
 
-  const scene = new Scene();
+  const gl = glx.renderer.gl;
+
+  const scene = new OGL.Transform();
   let vw = window.innerWidth;
   let vh = window.innerHeight;
 
@@ -31,9 +33,9 @@ export function createCardsScene(els) {
   // which lets tilted planes catch real foreshortening
   const camDist = 1000;
   const fov = 2 * Math.atan(vh / 2 / camDist) * (180 / Math.PI);
-  const camera = new PerspectiveCamera(fov, vw / vh, 10, 4000);
+  const camera = new OGL.Camera(gl, { fov, aspect: vw / vh, near: 10, far: 4000 });
   camera.position.z = camDist;
-  const geometry = new PlaneGeometry(1, 1);
+  const geometry = new OGL.Plane(gl, { width: 1, height: 1 });
 
   // shared cursor position (px) + velocity → uv-space rgb shift + tilt anchor
   const vel = { x: 0, y: 0 };
@@ -73,9 +75,9 @@ export function createCardsScene(els) {
     const img = el.querySelector('img');
     if (!img) return;
 
-    const material = new ShaderMaterial({
-      vertexShader: cardVertex,
-      fragmentShader: cardFragment,
+    const material = new OGL.Program(gl, {
+      vertex: cardVertex,
+      fragment: cardFragment,
       transparent: true,
       depthWrite: false,
       depthTest: false,
@@ -83,15 +85,23 @@ export function createCardsScene(els) {
         uMap: { value: null },
         uHover: { value: 0 },
         uTime: { value: Math.random() * 20 },
-        uShift: { value: new Vector2() },
-        uSize: { value: new Vector2(1, 1) },
+        uShift: { value: new OGL.Vec2() },
+        uSize: { value: new OGL.Vec2(1, 1) },
         uRadius: { value: 6 },
         uParallax: { value: 0 },
       },
     });
-    const mesh = new Mesh(geometry, material);
+    // Separate-alpha premultiplied blend so sceneRT accumulates content the
+    // way oglPost's composite expects (see heroScene.js's identical fix —
+    // Task C finding). cardFragment outputs straight (non-premultiplied)
+    // color with a rounded-rect mask alpha; without this override OGL's
+    // default transparent blend func (chosen from the renderer's
+    // premultipliedAlpha:true flag) reads the sceneRT wrong and cards wash
+    // out / lose the mask edge.
+    material.setBlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    const mesh = new OGL.Mesh(gl, { geometry, program: material });
     mesh.visible = false;
-    scene.add(mesh);
+    mesh.setParent(scene);
 
     const plane = {
       el,
@@ -121,10 +131,14 @@ export function createCardsScene(els) {
       cnv.height = 768;
       const c2d = cnv.getContext('2d');
       c2d.drawImage(image, 0, 0, cnv.width, cnv.height);
-      const tex = new CanvasTexture(cnv);
-      tex.colorSpace = SRGBColorSpace;
-      tex.minFilter = LinearFilter;
-      tex.wrapS = tex.wrapT = ClampToEdgeWrapping;
+      const tex = new OGL.Texture(gl, {
+        image: cnv,
+        generateMipmaps: false,
+        minFilter: gl.LINEAR,
+        magFilter: gl.LINEAR,
+        wrapS: gl.CLAMP_TO_EDGE,
+        wrapT: gl.CLAMP_TO_EDGE,
+      });
       material.uniforms.uMap.value = tex;
       plane.tex = tex;
       plane.ready = true;
@@ -153,8 +167,7 @@ export function createCardsScene(els) {
       vw = w;
       vh = h;
       camera.fov = 2 * Math.atan(vh / 2 / camDist) * (180 / Math.PI);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
+      camera.perspective({ fov: camera.fov, aspect: w / h });
     },
 
     render(_t, dt) {
@@ -219,7 +232,7 @@ export function createCardsScene(els) {
         p.material.uniforms.uShift.value.set(shift.x * 0.045, shift.y * 0.03);
         p.material.uniforms.uParallax.value = gsap.utils.clamp(-1, 1, p.px / (vw * 0.5));
       });
-      glx.renderer.render(scene, camera);
+      glx.renderer.render({ scene, camera, target: glx.sceneTarget, clear: false });
     },
 
     dispose() {
@@ -231,10 +244,13 @@ export function createCardsScene(els) {
           p.el.removeEventListener('mouseleave', p.onLeave);
         }
         p.img.style.opacity = '';
-        p.tex?.dispose();
-        p.material.dispose();
+        if (p.tex) gl.deleteTexture(p.tex.texture);
+        gl.deleteProgram(p.material.program);
       });
-      geometry.dispose();
+      gl.deleteBuffer(geometry.attributes.position.buffer);
+      gl.deleteBuffer(geometry.attributes.uv.buffer);
+      gl.deleteBuffer(geometry.attributes.normal.buffer);
+      if (geometry.attributes.index) gl.deleteBuffer(geometry.attributes.index.buffer);
     },
   };
 }
