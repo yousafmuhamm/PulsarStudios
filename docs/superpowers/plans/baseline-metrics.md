@@ -62,3 +62,36 @@ Recommended optimizations to measure against this baseline:
 - GSAP feature-based tree-shaking or lazy initialization
 - CSS purification and critical path optimization
 - Asset preloading and font optimization
+
+---
+
+## AFTER Phase 1 (OGL port + lazy-load) — 2026-07-10
+
+**Commit:** `bf69b3e` (+ Phase 1 verification)
+
+| Asset | Raw (KB) | Gz (KB) | Notes |
+|-------|----------|---------|-------|
+| gsap-*.js | 129.6 | 48.0 | unchanged (already optimal) |
+| ogl-*.js | 59.7 | 16.5 | **replaces three (was 124.4 gz)** — async chunk |
+| main-*.js | 31.1 | 10.3 | was 47.4/16.2 — **-42% gz** |
+| main-*.css | 28.7 | 6.7 | unchanged |
+| renderer-*.js | 7.9 | 2.9 | async (lazy) |
+| shaders-*.js | 7.0 | 2.9 | async (lazy) |
+| heroScene-*.js | 4.1 | 2.0 | async (lazy) |
+| cardsScene-*.js | 3.9 | 1.9 | async (lazy) |
+
+**Total: 272 KB raw / 91 KB gz** (was 708 KB raw / 195 KB gz) — **~53% smaller raw, ~53% smaller gz.**
+
+**Critical-path (first paint):** main (10.3) + css (6.7) + gsap (48.0) ≈ **65 KB gz**. The entire GL layer (~26 KB gz) is deferred to after first paint.
+
+### What changed in Phase 1
+1. Three.js import refactor (kept for cleanliness; couldn't shrink Three itself).
+2. GSAP / loading-hygiene: verified already optimal, no change.
+3. **Three.js → OGL port** (the big win): GL engine 124 KB gz → 16.5 KB gz (~87% smaller). Validated on Apple M3 Pro after fixing 6 GPU/render bugs (blend, shader-warmup, parallax-gate, OES_texture_float_linear, depthTest sort, pow-NaN).
+4. **Lazy-load GL** after first paint: main chunk -42%, GL fully deferred.
+
+### Verification
+- Full-site smoke test (home/about/projects/project): all render, GL ok, no crashes.
+- Steady-state 59fps (matches Three baseline); no runtime regression.
+- Hero + cards visually confirmed on the user's M3 Pro.
+- Note: live-browser FCP/TTI still to be captured manually by the user; localhost load was already sub-250ms FCP before Phase 1.
