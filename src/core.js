@@ -16,10 +16,15 @@ export let lenis = null;
 
 export function initScroll() {
   if (reducedMotion) return null; // native scroll, simple fades elsewhere
+  // On touch devices, native scrolling + momentum is what users expect; Lenis
+  // hijacking touch makes it feel "wonky" and can fight the browser's own
+  // scroll. Run Lenis for the wheel (desktop) glide only, and let touch pass
+  // straight through to the native scroller.
   lenis = new Lenis({
     autoRaf: false,
     lerp: 0.09, // a touch more float — silkier glide without feeling laggy
     wheelMultiplier: 1,
+    syncTouch: false, // do not smooth/hijack touch — native momentum instead
   });
   lenis.on('scroll', ScrollTrigger.update);
   gsap.ticker.add((time) => lenis.raf(time * 1000));

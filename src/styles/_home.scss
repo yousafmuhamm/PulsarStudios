@@ -266,4 +266,29 @@ html.touch .work-card {
     align-items: flex-start;
     gap: 1.5rem;
   }
+
+  /* On touch the JS pin/translate is disabled, so the max-content-wide card
+     track would overflow the page and let the whole thing pan sideways. Make
+     the pin a native horizontal swipe container instead: the track scrolls
+     WITHIN it (contained), never spilling into the document width. */
+  .work__pin {
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    /* trim the native scrollbar visual on mobile */
+    scrollbar-width: none;
+  }
+  .work__pin::-webkit-scrollbar {
+    display: none;
+  }
+  .work__track {
+    /* let each card snap; width stays max-content but is now contained by
+       the scrollable pin above, not the page */
+    scroll-snap-align: start;
+  }
+  .work-card {
+    scroll-snap-align: start;
+  }
 }

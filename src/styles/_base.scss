@@ -10,6 +10,9 @@ html {
   -webkit-text-size-adjust: 100%;
   scrollbar-width: thin;
   scrollbar-color: var(--muted) transparent;
+  /* hard guard against any child overflowing and letting the whole page pan
+     sideways on touch (clip on <html> too, not just <body>) */
+  overflow-x: clip;
 }
 
 html.lenis,
