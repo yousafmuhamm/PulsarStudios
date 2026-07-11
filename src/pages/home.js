@@ -184,7 +184,12 @@ export function createHomePage(main) {
       // Kick off scene creation without blocking setup()/gsap.context(),
       // which must stay synchronous. `destroyed` guards against the page
       // being torn down (router nav away) before the chunk resolves.
-      setupGL();
+      //
+      // On touch devices we skip WebGL ENTIRELY — no canvas, no render loop,
+      // no GPU cost — so weak mobile hardware stays smooth for scrolling and
+      // taps. The hero instead gets a pure-CSS glow (html.touch .hero, see
+      // _home.scss) that echoes the blob colours. Desktop is unaffected.
+      if (!isTouch) setupGL();
     },
 
     enter() {

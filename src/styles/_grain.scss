@@ -48,6 +48,11 @@
   100% { transform: translate(5%, 3%); }
 }
 
+/* Freeze the grain on touch too: a full-viewport soft-light-blended element
+   re-transforming every 0.8s is continuous GPU repaint work that makes weak
+   mobile devices feel sluggish everywhere. The static grain texture still
+   reads; it just stops animating. (Desktop keeps the live shimmer.) */
+html.touch .grain::before,
 html.reduced-motion .grain::before {
   animation: none;
 }

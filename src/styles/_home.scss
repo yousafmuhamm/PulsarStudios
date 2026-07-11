@@ -22,6 +22,19 @@
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
 }
 
+/* Touch: no WebGL canvas at all (pages/home.js skips it), so the hero gets a
+   richer multi-colour CSS glow where the blob cluster would be — violet/cyan/
+   lime layered radial gradients read as a premium luminous presence with zero
+   GPU/render-loop cost. Positioned top-right like the desktop cluster. */
+html.touch .hero::before {
+  background:
+    radial-gradient(ellipse 55% 45% at 74% 30%, rgba(101, 51, 255, 0.42), transparent 66%),
+    radial-gradient(ellipse 42% 38% at 88% 44%, rgba(49, 198, 232, 0.34), transparent 64%),
+    radial-gradient(ellipse 30% 28% at 66% 20%, rgba(184, 255, 44, 0.16), transparent 62%),
+    radial-gradient(ellipse 50% 40% at 80% 56%, rgba(101, 51, 255, 0.22), transparent 70%);
+  filter: blur(6px);
+}
+
 .hero__title {
   font-size: min(var(--fs-hero), 13vh);
   font-weight: var(--wt-display);
