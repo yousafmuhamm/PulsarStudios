@@ -3,7 +3,7 @@
  * from template functions in src/templates/ and data in src/data/projects.js.
  *
  * Generated artifacts (gitignored):
- *   index.html, about.html, projects.html, projects/<slug>.html
+ *   index.html, about.html, projects.html
  *   public/assets/img/projects/<slug>-{hero,a,b,thumb}.svg
  */
 import fs from 'node:fs';
@@ -22,7 +22,7 @@ export async function generateAll() {
   // templates read this to cache-bust their own nested imports (chrome.js)
   globalThis.__pulsarGenT = Date.now();
   const { projects } = await loadFresh('src/data/projects.js');
-  const { renderHome, renderAbout, renderProjectsList, renderProjectDetail } =
+  const { renderHome, renderAbout, renderProjectsList } =
     await loadFresh('src/templates/pages.js');
 
   const write = (rel, content) => {
@@ -38,15 +38,8 @@ export async function generateAll() {
     projects: write('projects.html', renderProjectsList(projects)),
   };
 
-  projects.forEach((p, i) => {
-    inputs[`project-${p.slug}`] = write(
-      `projects/${p.slug}.html`,
-      renderProjectDetail(p, projects, i)
-    );
-  });
-
   const origin = 'https://pulsarstudios.com';
-  const urls = ['/', '/about.html', '/projects.html', ...projects.map((p) => `/projects/${p.slug}.html`)];
+  const urls = ['/', '/about.html', '/projects.html'];
   write(
     'public/sitemap.xml',
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls

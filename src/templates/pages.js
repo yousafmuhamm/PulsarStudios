@@ -44,7 +44,7 @@ export function renderHome(projects) {
     <div class="work__track" data-work-track>
       ${featured
         .map(
-          (p, i) => `<a class="work-card" href="/projects/${p.slug}.html" data-cursor="Open">
+          (p, i) => `<a class="work-card" href="${p.url}" target="_blank" rel="noopener" data-cursor="Visit site">
         <figure class="work-card__media" data-gl-img data-gl-slug="${p.slug}">
           ${img(p.slug, 'thumb', `${p.title} — ${p.sector} project by Pulsar Studios`, 'work-card__img')}
         </figure>
@@ -284,80 +284,3 @@ ${footer({ nextHref: '/', nextLabel: 'Home' })}`;
   });
 }
 
-/* -------------------------------------------------------- PROJECT DETAIL */
-
-export function renderProjectDetail(p, projects, i) {
-  const next = projects[(i + 1) % projects.length];
-  const alt = (v) => `${p.title} — ${p.sector} project by Pulsar Studios (${v})`;
-  const main = `
-<article class="case" data-case>
-  <figure class="case__hero" data-case-hero>
-    ${img(p.slug, 'hero', alt('hero'), 'case__hero-img', true)}
-  </figure>
-  <header class="case__head">
-    <h1 class="case__title" data-reveal-load="words">${p.title}</h1>
-    <dl class="case__meta mono">
-      <div><dt>Sector</dt><dd>${p.sector}</dd></div>
-      <div><dt>Year</dt><dd>${p.year}</dd></div>
-      <div><dt>Scope</dt><dd>${tags(p)}</dd></div>
-      <div><dt>Role</dt><dd>${p.roles?.join('<br>') || ''}</dd></div>
-    </dl>
-  </header>
-
-  <section class="case__block">
-    <p class="mono eyebrow" data-reveal="fade">The brief</p>
-    <p class="case__para" data-scrub-words data-skew>${em(p.brief || '')}</p>
-  </section>
-
-  <figure class="case__img case__img--left" data-parallax-img>
-    ${img(p.slug, 'a', alt('detail 1'), '')}
-  </figure>
-
-  <section class="case__block case__block--right">
-    <p class="mono eyebrow" data-reveal="fade">What we did</p>
-    <p class="case__para" data-scrub-words data-skew>${em(p.approach || '')}</p>
-  </section>
-
-  <figure class="case__img case__img--right" data-parallax-img>
-    ${img(p.slug, 'b', alt('detail 2'), '')}
-  </figure>
-
-  <blockquote class="case__quote">
-    <p class="case__quote-text" data-reveal="lines">&ldquo;${p.quote || ''}&rdquo;</p>
-    <cite class="mono case__quote-cite" data-reveal="fade">${p.quoteAuthor || ''}</cite>
-  </blockquote>
-
-  <section class="case__stats" aria-label="Results">
-    ${(p.stats || [])
-      .map(
-        ([v, label]) => `<div class="case__stat" data-reveal="fade">
-      <span class="case__stat-value mono">${v}</span>
-      <span class="mono case__stat-label">${label}</span>
-    </div>`
-      )
-      .join('')}
-  </section>
-
-  <a class="case__next section--dark" href="/projects/${next.slug}.html" data-next-page="/projects/${next.slug}.html" data-cursor="Open">
-    <span class="mono case__next-eyebrow">Next project</span>
-    <span class="case__next-title">${next.title}</span>
-    <figure class="case__next-media">${img(next.slug, 'thumb', `${next.title} — next project`, 'case__next-img')}</figure>
-    <span class="footer__next-bar case__next-bar"><span class="footer__next-fill" data-next-fill></span></span>
-  </a>
-
-  <div class="case__foot mono">
-    <a href="/projects.html">&larr; All projects</a>
-    <span>&copy;2026 PULSAR STUDIOS</span>
-    <a href="mailto:hello@pulsarstudios.com">hello@pulsarstudios.com</a>
-  </div>
-</article>`;
-
-  return shell({
-    page: 'project',
-    title: `${p.title} — Case study — Pulsar Studios`,
-    description: `${p.title} (${p.sector}). ${(p.brief || '').slice(0, 140).replace(/\*/g, '')}…`,
-    path: `/projects/${p.slug}.html`,
-    main,
-    dark: false,
-  });
-}
