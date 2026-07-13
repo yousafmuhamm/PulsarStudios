@@ -292,13 +292,13 @@ export function renderProjectDetail(p, projects, i) {
       <div><dt>Sector</dt><dd>${p.sector}</dd></div>
       <div><dt>Year</dt><dd>${p.year}</dd></div>
       <div><dt>Scope</dt><dd>${tags(p)}</dd></div>
-      <div><dt>Role</dt><dd>${p.roles.join('<br>')}</dd></div>
+      <div><dt>Role</dt><dd>${p.roles?.join('<br>') || ''}</dd></div>
     </dl>
   </header>
 
   <section class="case__block">
     <p class="mono eyebrow" data-reveal="fade">The brief</p>
-    <p class="case__para" data-scrub-words data-skew>${em(p.brief)}</p>
+    <p class="case__para" data-scrub-words data-skew>${em(p.brief || '')}</p>
   </section>
 
   <figure class="case__img case__img--left" data-parallax-img>
@@ -307,7 +307,7 @@ export function renderProjectDetail(p, projects, i) {
 
   <section class="case__block case__block--right">
     <p class="mono eyebrow" data-reveal="fade">What we did</p>
-    <p class="case__para" data-scrub-words data-skew>${em(p.approach)}</p>
+    <p class="case__para" data-scrub-words data-skew>${em(p.approach || '')}</p>
   </section>
 
   <figure class="case__img case__img--right" data-parallax-img>
@@ -315,12 +315,12 @@ export function renderProjectDetail(p, projects, i) {
   </figure>
 
   <blockquote class="case__quote">
-    <p class="case__quote-text" data-reveal="lines">&ldquo;${p.quote}&rdquo;</p>
-    <cite class="mono case__quote-cite" data-reveal="fade">${p.quoteAuthor}</cite>
+    <p class="case__quote-text" data-reveal="lines">&ldquo;${p.quote || ''}&rdquo;</p>
+    <cite class="mono case__quote-cite" data-reveal="fade">${p.quoteAuthor || ''}</cite>
   </blockquote>
 
   <section class="case__stats" aria-label="Results">
-    ${p.stats
+    ${(p.stats || [])
       .map(
         ([v, label]) => `<div class="case__stat" data-reveal="fade">
       <span class="case__stat-value mono">${v}</span>
@@ -347,7 +347,7 @@ export function renderProjectDetail(p, projects, i) {
   return shell({
     page: 'project',
     title: `${p.title} — Case study — Pulsar Studios`,
-    description: `${p.title} (${p.sector}). ${p.brief.slice(0, 140).replace(/\*/g, '')}…`,
+    description: `${p.title} (${p.sector}). ${(p.brief || '').slice(0, 140).replace(/\*/g, '')}…`,
     path: `/projects/${p.slug}.html`,
     main,
     dark: false,
