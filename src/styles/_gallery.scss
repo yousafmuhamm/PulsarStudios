@@ -1,0 +1,286 @@
+/* ------------------------------------------------------ project gallery
+   Full-screen, snap-scrolling A+C gallery (Phase 4). One `.gslide` per
+   project, each tinted with that project's brand colors via the inline
+   `--slide-accent` / `--slide-deep` custom properties set in the markup.
+
+   SNAP STRATEGY: scroll-snap lives on the DOCUMENT scroller, not on
+   `.gallery` itself. `.gallery` is a plain block — it does NOT get
+   `overflow: auto` / its own `height: 100vh`. Only `.gslide` gets
+   `scroll-snap-align: start`, and `scroll-snap-type` is applied to `html`
+   but SCOPED to the projects page via `body[data-page="projects"]` (see
+   bottom of file) so home/about are unaffected. This keeps the page as a
+   single scroller that Lenis already drives — a nested `overflow:auto`
+   container would create a second scroller Lenis doesn't know about and
+   would desync smooth-scroll (this bit us in Phase 3). `proximity`, not
+   `mandatory`, so a fast flick or Lenis's momentum can't get trapped
+   fighting the snap points. */
+
+.gallery {
+  position: relative;
+}
+
+.gslide {
+  min-height: 100svh;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  scroll-snap-align: start;
+  scroll-snap-stop: normal;
+  /* reserve room at the top for the fixed header — a long project name at
+     the huge display size can run to 3-4 lines and, being bottom-anchored,
+     grow upward; without this the top line can duck under (or collide
+     with) the header on tall names like "Xandrea Harshey". */
+  padding: calc(var(--header-h) + clamp(1.5rem, 4vh, 3rem)) var(--gutter) clamp(2rem, 6vh, 5rem);
+  overflow: hidden;
+}
+
+/* brand-tinted backdrop — a soft glow of the project's accent color over its
+   deep/near-black base, sitting behind media + copy. Subtle and luminous
+   rather than a flat wash, so it reads as premium ambient light. */
+.gslide__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(
+      70% 80% at 72% 40%,
+      color-mix(in srgb, var(--slide-accent, var(--accent)) 45%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      55% 60% at 18% 88%,
+      color-mix(in srgb, var(--slide-accent, var(--accent)) 16%, transparent),
+      transparent 72%
+    ),
+    var(--slide-deep, #0d0d0f);
+}
+
+/* the screenshot floats large toward the upper-right, slightly tilted —
+   the signature "premium showcase" gesture. */
+.gslide__media {
+  position: absolute;
+  right: clamp(2%, 5vw, 7%);
+  top: 50%;
+  transform: translateY(-50%) rotate(-2deg);
+  width: min(48vw, 640px);
+  z-index: 1;
+  margin: 0;
+  transition: transform 0.6s var(--ease-out);
+}
+
+.gslide__media img {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: block;
+}
+
+.gslide__info {
+  position: relative;
+  z-index: 2;
+  max-width: 44ch;
+}
+
+.gslide__eyebrow {
+  color: var(--slide-accent, var(--accent));
+  margin-bottom: 0.4em;
+}
+
+.gslide__name {
+  font-family: var(--font-display);
+  /* long project names (e.g. "Xandrea Harshey") need a lower ceiling than
+     a short one-word name would, otherwise they wrap to 3-4 lines at 8rem
+     and — being bottom-anchored — grow up past the header. Clamp is sized
+     against ch of THIS element's own font, so it scales with font-size. */
+  font-size: clamp(2.6rem, 7.2vw, 6.4rem);
+  font-weight: var(--wt-display);
+  letter-spacing: var(--ls-display);
+  line-height: 0.95;
+  margin: 0.2em 0;
+  max-width: 12ch;
+  color: var(--ink);
+  text-shadow: 0 4px 40px rgba(0, 0, 0, 0.45);
+}
+
+.gslide__meta {
+  color: var(--muted);
+}
+
+.gslide__tagline {
+  font-size: clamp(1.1rem, 2vw, 1.6rem);
+  color: var(--ink);
+  max-width: 34ch;
+  margin: 0.6em 0 1.2em;
+  line-height: 1.35;
+}
+
+.gslide__visit {
+  border-color: color-mix(in srgb, var(--ink) 50%, transparent);
+  transition:
+    color var(--dur-hover) var(--ease-out),
+    border-color var(--dur-hover) var(--ease-out),
+    transform 0.35s var(--ease-out);
+}
+
+.gslide__visit:hover {
+  border-color: var(--slide-accent, var(--accent));
+}
+
+/* -------------------------------------------------------------- index rail
+   Fixed column of buttons on the right edge; the active project (toggled by
+   Task 6's JS via IntersectionObserver) gets full opacity + a lime tick. */
+.gindex {
+  position: fixed;
+  right: clamp(16px, 2vw, 32px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  align-items: flex-end;
+}
+
+.gindex__item {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--ink) 35%, transparent);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  letter-spacing: -0.01em;
+  transition: color 0.3s var(--ease-out);
+  padding: 0.15em 0;
+  /* the rail sits in front of each slide's floating screenshot (media is
+     z-index 1, rail is z-index 40) — a soft dark shadow keeps the low-
+     opacity label legible even when a bright screenshot corner is behind
+     it, without needing a background chip. */
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7);
+}
+
+.gindex__item:hover {
+  color: color-mix(in srgb, var(--ink) 70%, transparent);
+}
+
+.gindex__bar {
+  width: 0;
+  height: 2px;
+  background: var(--accent-2);
+  display: inline-block;
+  border-radius: 1px;
+  transition: width 0.35s var(--ease-out);
+}
+
+.gindex__n {
+  color: inherit;
+  opacity: 0.7;
+}
+
+.gindex__item.is-active {
+  color: var(--ink);
+}
+
+.gindex__item.is-active .gindex__bar {
+  width: 20px;
+}
+
+/* ------------------------------------------------------- progress track
+   Thin fixed rail that fills as the gallery scrolls, driven purely by the
+   compositor via animation-timeline: scroll() — same cheap pattern as the
+   global `.scroll-rail` in _chrome.scss. No JS scroll handler, no per-frame
+   main-thread writes (that's what tanked FPS to 30 in Phase 3). */
+.gindex__progress-track {
+  position: fixed;
+  right: clamp(4px, 1vw, 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: clamp(140px, 26vh, 260px);
+  border-radius: 2px;
+  background: rgba(242, 241, 239, 0.12);
+  z-index: 39;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.gindex__progress {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(var(--accent-2), var(--accent-3));
+  transform-origin: top center;
+  transform: scaleY(0);
+  animation: gallery-progress-fill linear both;
+  animation-timeline: scroll(root block);
+}
+
+@keyframes gallery-progress-fill {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+html.reduced-motion .gindex__progress {
+  animation: none;
+}
+
+/* ---------------------------------------------------------------- snap
+   Scoped to the projects page only so home/about scroll-snap behavior is
+   untouched. `proximity` (not `mandatory`) so Lenis's momentum/inertia can
+   glide past a slide without ever getting stuck fighting a hard snap point. */
+body[data-page='projects'] {
+  scroll-snap-type: y proximity;
+}
+
+html.reduced-motion body[data-page='projects'] {
+  scroll-snap-type: none;
+}
+
+/* --------------------------------------------------------- reduced motion
+   No float/tilt/scatter — slides stay static and legible. */
+html.reduced-motion .gslide__media {
+  transform: none;
+}
+
+/* ------------------------------------------------------------- responsive
+   Mobile: drop the index rail + progress rail (declutter), stack media
+   above copy, scale the name down. Pure CSS already, so this is
+   mobile-safe by construction — no WebGL involved. */
+@media (max-width: 720px) {
+  .gindex,
+  .gindex__progress-track {
+    display: none;
+  }
+
+  .gslide {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-end;
+    padding-top: calc(var(--header-h) + 4vh);
+  }
+
+  .gslide__media {
+    position: static;
+    transform: none;
+    width: 100%;
+    margin-bottom: 1.5rem;
+  }
+
+  .gslide__info {
+    max-width: none;
+  }
+
+  .gslide__name {
+    font-size: clamp(2.4rem, 12vw, 4rem);
+  }
+}
