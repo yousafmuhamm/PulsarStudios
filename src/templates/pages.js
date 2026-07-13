@@ -243,34 +243,42 @@ ${footer({ nextHref: '/projects.html', nextLabel: 'Projects' })}`;
 
 export function renderProjectsList(projects) {
   const main = `
-<section class="plist" aria-label="All projects">
-  <header class="plist__head">
-    <h1 class="plist__title mono" data-reveal-load="chars">PROJECTS &mdash; 0${projects.length}</h1>
-    <p class="plist__sub" data-reveal-load="lines">Every launch is a case study in attention. Here are ${projects.length} of ours.</p>
-  </header>
-  <ul class="plist__rows" data-plist data-skew>
+<div class="gallery" data-gallery>
+  ${projects
+    .map(
+      (p, i) => `<section class="gslide" data-gslide data-index="${i}"
+           style="--slide-accent:${p.palette[0]}; --slide-deep:${p.palette[1]}">
+    <div class="gslide__bg"></div>
+    <figure class="gslide__media">
+      <img src="/assets/img/projects/${p.slug}-hero.jpg" alt="${p.title} — ${p.sector}"
+           loading="${i < 2 ? 'eager' : 'lazy'}" decoding="async">
+    </figure>
+    <div class="gslide__info">
+      <p class="mono gslide__eyebrow">Project ${String(i + 1).padStart(2, '0')} / 08 · ${p.city}</p>
+      <h2 class="gslide__name" data-reveal="scatter">${p.title}</h2>
+      <p class="mono gslide__meta">${p.sector} · ${p.tags.join(' · ')} · ${p.year}</p>
+      <p class="gslide__tagline">${p.tagline}</p>
+      <a class="gslide__visit pill pill--ghost" href="${p.url}" target="_blank" rel="noopener" data-magnetic data-cursor="Visit site">Visit live site &#8599;</a>
+    </div>
+  </section>`
+    )
+    .join('')}
+  <nav class="gindex" data-gindex aria-label="Project index">
     ${projects
       .map(
-        (p, i) => `<li class="prow" data-reveal="fade">
-      <a class="prow__link" href="/projects/${p.slug}.html" data-cursor="Open" data-prow data-thumb="/assets/img/projects/${p.slug}-thumb.jpg">
-        <span class="mono prow__idx">0${i + 1}</span>
-        <span class="prow__name">${p.title}</span>
-        <span class="mono prow__tags">${tags(p)}</span>
-        <span class="mono prow__year">${p.year}</span>
-      </a>
-    </li>`
+        (p, i) => `<button class="gindex__item" type="button" data-gindex-to="${i}"><span class="gindex__bar"></span>${p.title}<span class="mono gindex__n">${String(i + 1).padStart(2, '0')}</span></button>`
       )
       .join('')}
-  </ul>
-  <div class="plist__float" data-plist-float aria-hidden="true"><img class="plist__float-img" data-plist-img src="/assets/img/projects/${projects[0].slug}-thumb.jpg" alt=""></div>
-</section>
+  </nav>
+  <div class="gindex__progress-track" aria-hidden="true"><span class="gindex__progress" data-gallery-progress></span></div>
+</div>
 ${footer({ nextHref: '/', nextLabel: 'Home' })}`;
 
   return shell({
     page: 'projects',
-    title: 'Projects — Pulsar Studios',
+    title: 'Work — Pulsar Studios',
     description:
-      'Selected work by Pulsar Studios — websites, e-commerce, WebGL experiences and digital platforms that moved real numbers.',
+      'Real client sites by Pulsar Studios — mobile car wash, restaurant, construction, property management and more, each launched and live.',
     path: '/projects.html',
     main,
   });
