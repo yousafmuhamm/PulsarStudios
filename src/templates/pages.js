@@ -7,7 +7,7 @@ const { shell, footer, em } = await import(
 );
 
 const img = (slug, variant, alt, cls = '', eager = false) =>
-  `<img class="${cls}" src="/assets/img/projects/${slug}-${variant}.svg" alt="${alt}" ${
+  `<img class="${cls}" src="/assets/img/projects/${slug}-${variant}.jpg" alt="${alt}" ${
     eager ? 'fetchpriority="high"' : 'loading="lazy"'
   } decoding="async" width="1200" height="900">`;
 
@@ -252,7 +252,7 @@ export function renderProjectsList(projects) {
     ${projects
       .map(
         (p, i) => `<li class="prow" data-reveal="fade">
-      <a class="prow__link" href="/projects/${p.slug}.html" data-cursor="Open" data-prow data-thumb="/assets/img/projects/${p.slug}-thumb.svg">
+      <a class="prow__link" href="/projects/${p.slug}.html" data-cursor="Open" data-prow data-thumb="/assets/img/projects/${p.slug}-thumb.jpg">
         <span class="mono prow__idx">0${i + 1}</span>
         <span class="prow__name">${p.title}</span>
         <span class="mono prow__tags">${tags(p)}</span>
@@ -262,7 +262,7 @@ export function renderProjectsList(projects) {
       )
       .join('')}
   </ul>
-  <div class="plist__float" data-plist-float aria-hidden="true"><img class="plist__float-img" data-plist-img src="/assets/img/projects/${projects[0].slug}-thumb.svg" alt=""></div>
+  <div class="plist__float" data-plist-float aria-hidden="true"><img class="plist__float-img" data-plist-img src="/assets/img/projects/${projects[0].slug}-thumb.jpg" alt=""></div>
 </section>
 ${footer({ nextHref: '/', nextLabel: 'Home' })}`;
 
