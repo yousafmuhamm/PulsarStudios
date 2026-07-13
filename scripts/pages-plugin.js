@@ -24,7 +24,6 @@ export async function generateAll() {
   const { projects } = await loadFresh('src/data/projects.js');
   const { renderHome, renderAbout, renderProjectsList, renderProjectDetail } =
     await loadFresh('src/templates/pages.js');
-  const { projectArt } = await loadFresh('src/templates/placeholder.js');
 
   const write = (rel, content) => {
     const abs = path.join(root, rel);
@@ -44,10 +43,6 @@ export async function generateAll() {
       `projects/${p.slug}.html`,
       renderProjectDetail(p, projects, i)
     );
-    write(`public/assets/img/projects/${p.slug}-thumb.svg`, projectArt(p, 'thumb', 1200, 900));
-    write(`public/assets/img/projects/${p.slug}-hero.svg`, projectArt(p, 'hero', 2000, 1250));
-    write(`public/assets/img/projects/${p.slug}-a.svg`, projectArt(p, 'a', 1400, 1050));
-    write(`public/assets/img/projects/${p.slug}-b.svg`, projectArt(p, 'b', 1400, 1050));
   });
 
   const origin = 'https://pulsarstudios.com';
