@@ -10,3 +10,4 @@ dist
 /public/assets/img/projects/*.svg
 /public/sitemap.xml
 /public/robots.txt
+.superpowers/
