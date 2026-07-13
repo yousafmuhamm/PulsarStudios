@@ -38,7 +38,7 @@ export function renderHome(projects) {
 <section class="work" data-work aria-label="Featured work">
   <header class="work__head">
     <p class="mono eyebrow" data-reveal="fade">Featured Work</p>
-    <h2 class="work__title" data-reveal="scatter">Six projects that moved the numbers that matter</h2>
+    <h2 class="work__title" data-reveal="scatter">Real brands. Real sites. Built to be impossible to ignore.</h2>
   </header>
   <div class="work__pin" data-work-pin>
     <div class="work__track" data-work-track>
@@ -254,7 +254,7 @@ export function renderProjectsList(projects) {
            loading="${i < 2 ? 'eager' : 'lazy'}" decoding="async">
     </figure>
     <div class="gslide__info">
-      <p class="mono gslide__eyebrow">Project ${String(i + 1).padStart(2, '0')} / 08 · ${p.city}</p>
+      <p class="mono gslide__eyebrow">Project ${String(i + 1).padStart(2, '0')} / ${String(projects.length).padStart(2, '0')} · ${p.city}</p>
       <h2 class="gslide__name" data-reveal="scatter">${p.title}</h2>
       <p class="mono gslide__meta">${p.sector} · ${p.tags.join(' · ')} · ${p.year}</p>
       <p class="gslide__tagline">${p.tagline}</p>
