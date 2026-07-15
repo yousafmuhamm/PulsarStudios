@@ -55,15 +55,89 @@
     var(--slide-deep, #0d0d0f);
 }
 
+/* ------------------------------------------------ kinetic name marquee
+   Direction D "Kinetic Cinema": the project name repeats as a giant band
+   that drifts horizontally behind the media — outline + solid words
+   alternating, brand-accent light bleeding through. Sits above the bg glow
+   but below the screenshot + copy, so it reads as a huge kinetic backdrop.
+   Driven by a CSS transform keyframe (compositor-only, no JS). */
+.gslide__marquee {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* sit the band in the UPPER third so it reads as a kinetic backdrop behind
+     the screenshot, not colliding with the bottom-anchored info name/tagline */
+  top: 30%;
+  transform: translateY(-50%);
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+.gslide__marquee-track {
+  display: inline-flex;
+  white-space: nowrap;
+  will-change: transform;
+  animation: gslide-marquee 26s linear infinite;
+}
+
+.gslide__marquee-word {
+  font-family: var(--font-display);
+  font-size: clamp(4rem, 15vw, 15rem);
+  font-weight: 850;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  padding: 0 0.12em;
+  /* outline word: transparent fill, faint stroke */
+  color: transparent;
+  -webkit-text-stroke: 1.4px color-mix(in srgb, var(--ink) 26%, transparent);
+}
+
+.gslide__marquee-word.is-solid {
+  /* solid word: brand-tinted, with a subtle RGB-split via layered shadows */
+  color: color-mix(in srgb, var(--ink) 88%, var(--slide-accent, var(--accent)));
+  -webkit-text-stroke: 0;
+  text-shadow:
+    3px 0 color-mix(in srgb, var(--slide-accent, var(--accent-3)) 60%, transparent),
+    -3px 0 rgba(255, 79, 163, 0.5);
+  animation: gslide-rgb 4.5s ease-in-out infinite;
+}
+
+@keyframes gslide-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    /* 6 words → shift by half for a seamless loop */
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes gslide-rgb {
+  0%,
+  100% {
+    text-shadow:
+      2px 0 color-mix(in srgb, var(--slide-accent, var(--accent-3)) 55%, transparent),
+      -2px 0 rgba(255, 79, 163, 0.45);
+  }
+  50% {
+    text-shadow:
+      6px 0 color-mix(in srgb, var(--slide-accent, var(--accent-3)) 70%, transparent),
+      -6px 0 rgba(255, 79, 163, 0.6);
+  }
+}
+
 /* the screenshot floats large toward the upper-right, slightly tilted —
-   the signature "premium showcase" gesture. */
+   the signature "premium showcase" gesture. Bumped a touch larger for the
+   cinematic treatment so the real work stays the star over the marquee. */
 .gslide__media {
   position: absolute;
   right: clamp(2%, 5vw, 7%);
   top: 50%;
   transform: translateY(-50%) rotate(-2deg);
-  width: min(48vw, 640px);
-  z-index: 1;
+  width: min(50vw, 680px);
+  z-index: 2;
   margin: 0;
   transition: transform 0.6s var(--ease-out);
 }
@@ -79,7 +153,7 @@
 
 .gslide__info {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   max-width: 44ch;
 }
 
@@ -247,9 +321,15 @@ html.reduced-motion body[data-page='projects'] {
 }
 
 /* --------------------------------------------------------- reduced motion
-   No float/tilt/scatter — slides stay static and legible. */
+   No float/tilt/scatter, and freeze the kinetic marquee + RGB-split — slides
+   stay static and legible. */
 html.reduced-motion .gslide__media {
   transform: none;
+}
+
+html.reduced-motion .gslide__marquee-track,
+html.reduced-motion .gslide__marquee-word.is-solid {
+  animation: none;
 }
 
 /* ------------------------------------------------------------- responsive
@@ -282,5 +362,18 @@ html.reduced-motion .gslide__media {
 
   .gslide__name {
     font-size: clamp(2.4rem, 12vw, 4rem);
+  }
+
+  /* the giant kinetic marquee is a desktop flourish; on phones it fights the
+     stacked media/copy for space and hurts readability — pull it to the top
+     as a slimmer band behind the header area rather than through the middle. */
+  .gslide__marquee {
+    top: calc(var(--header-h) + 2.5rem);
+    transform: none;
+    opacity: 0.5;
+  }
+
+  .gslide__marquee-word {
+    font-size: clamp(3rem, 22vw, 6rem);
   }
 }

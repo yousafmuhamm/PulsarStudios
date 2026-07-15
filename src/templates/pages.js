@@ -249,6 +249,14 @@ export function renderProjectsList(projects) {
       (p, i) => `<section class="gslide" data-gslide data-index="${i}"
            style="--slide-accent:${p.palette[0]}; --slide-deep:${p.palette[1]}">
     <div class="gslide__bg"></div>
+    <div class="gslide__marquee" aria-hidden="true">
+      <div class="gslide__marquee-track" data-gslide-marquee>${
+        // giant kinetic name — outline + solid alternating, repeated for a seamless loop
+        Array.from({ length: 6 }, (_, k) =>
+          `<span class="gslide__marquee-word${k % 2 ? ' is-solid' : ''}">${p.title}</span>`
+        ).join('')
+      }</div>
+    </div>
     <figure class="gslide__media">
       <img src="/assets/img/projects/${p.slug}-hero.jpg" alt="${p.title} — ${p.sector}"
            loading="${i < 2 ? 'eager' : 'lazy'}" decoding="async">
