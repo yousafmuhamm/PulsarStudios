@@ -94,25 +94,13 @@ const TEAM = [
     idx: '001',
     name: 'Muhammad Yousaf',
     role: 'Founder & Creative Director',
-    bio: 'Started Pulsar after six years directing digital work for studios on three continents. Believes a website is the one piece of brand you can actually feel.',
-  },
-  {
-    idx: '002',
-    name: 'Amara Diallo',
-    role: 'Design Lead',
-    bio: 'Typography obsessive. Runs the design side of our integrated process — every layout is tested in code within days, not weeks.',
-  },
-  {
-    idx: '003',
-    name: 'Tomas Novak',
-    role: 'Technical Director',
-    bio: 'Shader whisperer and performance zealot. If it ships below sixty frames a second, it does not ship.',
+    bio: 'Designs and builds every Pulsar site end to end — strategy, design, motion and code. Believes a website is the one piece of a brand you can actually feel.',
   },
 ];
 
 const BRANDS = [
-  'Nova Labs', 'Hearthside Coffee', 'Vantage Legal', 'Bloom Health', 'Kepler Finance',
-  'Aurora Festival', 'Atlas Outdoor', 'Mira Museum', 'Fable & Co', 'Northwind Air',
+  'Dr Shiny', 'Xandrea Harshey', 'Chick N Fish', 'Demarks360',
+  'Trail Construction', 'West Pine Strategies', 'Yeong Won', 'BW Plumbing',
 ];
 
 const STATS = [
@@ -165,7 +153,7 @@ export function renderAbout() {
 
 <section class="team" aria-label="The team">
   <h2 class="sr-only">The team</h2>
-  <p class="intro__para team__manifesto" data-scrub-words data-skew>A tight team of designers, developers and motion nerds turning ambitious ideas into websites people remember.</p>
+  <p class="intro__para team__manifesto" data-scrub-words data-skew>One designer-developer turning ambitious ideas into websites people remember &mdash; strategy, design, motion and code, all under one roof.</p>
   <div class="team__carousel" data-team-carousel data-cursor="Drag" tabindex="0" role="group" aria-label="Team members — drag or scroll horizontally">
     ${TEAM.map(
       (t) => `<article class="team-card">
@@ -184,7 +172,7 @@ export function renderAbout() {
   </div>
   <div class="team__process">
     <p class="mono eyebrow" data-reveal="fade">How we work</p>
-    <p class="team__process-para" data-reveal="fade">Design and engineering never split at Pulsar. The person drawing the interface sits beside the person building it, from kickoff to launch — so nothing gets lost in translation, and the wild ideas actually survive contact with the browser.</p>
+    <p class="team__process-para" data-reveal="fade">Design and engineering never split at Pulsar &mdash; because they are the same person. The one drawing the interface is the one building it, from kickoff to launch, so nothing gets lost in translation and the wild ideas actually survive contact with the browser.</p>
   </div>
 </section>
 
@@ -243,6 +231,7 @@ ${footer({ nextHref: '/projects.html', nextLabel: 'Projects' })}`;
 
 export function renderProjectsList(projects) {
   const main = `
+<h1 class="sr-only">Selected work — real client sites by Pulsar Studios</h1>
 <div class="gallery" data-gallery>
   ${projects
     .map(
