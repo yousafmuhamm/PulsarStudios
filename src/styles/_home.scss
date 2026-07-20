@@ -139,16 +139,20 @@ html.touch .hero::before {
 }
 
 .work-card__media {
-  aspect-ratio: 4 / 3;
+  /* match the real screenshot ratio (~16:9 desktop captures) so object-fit
+     shows the FULL width — a 4:3 box zoom-cropped the sides. object-fit is
+     `contain` (not cover) so nothing is cropped at all; the dark background
+     letterboxes gracefully if a shot's ratio differs slightly. */
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: 6px;
-  background: rgba(13, 13, 15, 0.05);
+  background: #0d0d0f;
 }
 
 .work-card__img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   will-change: transform;
 }
 

@@ -9,7 +9,7 @@ const { shell, footer, em } = await import(
 const img = (slug, variant, alt, cls = '', eager = false) =>
   `<img class="${cls}" src="/assets/img/projects/${slug}-${variant}.jpg" alt="${alt}" ${
     eager ? 'fetchpriority="high"' : 'loading="lazy"'
-  } decoding="async" width="1200" height="900">`;
+  } decoding="async" width="1600" height="900">`;
 
 const tags = (p) => p.tags.join(' &nbsp;&bull;&nbsp; ');
 
