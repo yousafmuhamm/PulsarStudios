@@ -9,7 +9,6 @@ import { isTouch, reducedMotion, qsa } from '../utils/env.js';
 
 export function createHomePage(main) {
   let hero = null;
-  let cards = null;
   let killGlow = null;
   let destroyed = false;
   // ScrollTriggers/tweens created after the async GL chunk resolves land
@@ -38,8 +37,6 @@ export function createHomePage(main) {
     glx = gl;
 
     const { createHeroScene } = await import('../gl/heroScene.js');
-    if (destroyed) return;
-    const { createCardsScene } = await import('../gl/cardsScene.js');
     if (destroyed) return;
 
     hero = createHeroScene();
@@ -86,9 +83,11 @@ export function createHomePage(main) {
       }
     }
 
-    cards = createCardsScene(qsa('[data-gl-img]', main));
-    if (cards) glx.add(cards);
-
+    // Featured Work cards intentionally render as plain <img> thumbnails now
+    // (no WebGL warp/hover-distortion) — the GL cards scene made the tall
+    // screenshots read as cropped/off, so we show them clean instead. The
+    // hero blob scene above is unaffected. (createCardsScene left imported
+    // but unused-on-home; kept for a possible future toggle.)
     heroReady = true;
     // enter() may have already run (and found no hero yet) if the GL
     // chunk resolved after the reveal — play the intro now instead.
@@ -206,10 +205,6 @@ export function createHomePage(main) {
       if (hero) {
         glx?.remove(hero);
         hero = null;
-      }
-      if (cards) {
-        glx?.remove(cards);
-        cards = null;
       }
     },
   });
