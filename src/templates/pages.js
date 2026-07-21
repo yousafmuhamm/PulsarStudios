@@ -103,13 +103,6 @@ const BRANDS = [
   'Trail Construction', 'West Pine Strategies', 'Yeong Won', 'BW Plumbing',
 ];
 
-const STATS = [
-  ['48', '', 'websites shipped'],
-  ['12', '', 'industry awards'],
-  ['6', '', 'years running'],
-  ['97', '%', 'clients returning'],
-];
-
 const EXPERTISE = [
   {
     glyph: '&#10035;', title: 'Strategy',
@@ -181,18 +174,6 @@ export function renderAbout() {
   ${marqueeRow(BRANDS.slice(0, 5).concat(BRANDS.slice(5)), 1, 40)}
   ${marqueeRow(BRANDS.slice(3).concat(BRANDS.slice(0, 3)), -1, 32)}
   ${marqueeRow(BRANDS.slice(7).concat(BRANDS.slice(0, 7)), 1, 48)}
-</section>
-
-<section class="numbers section--dark" aria-label="Studio in numbers">
-  <p class="mono eyebrow" data-reveal="fade">The scoreboard</p>
-  <dl class="numbers__grid">
-    ${STATS.map(
-      ([n, suffix, label]) => `<div class="numbers__cell" data-reveal="fade">
-      <dt class="mono numbers__label">${label}</dt>
-      <dd class="numbers__value mono"><span data-counter="${n}">0</span>${suffix}</dd>
-    </div>`
-    ).join('')}
-  </dl>
 </section>
 
 <section class="expertise" aria-label="Area of expertise">
